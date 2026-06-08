@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.savant.gateway</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>NODE_BIN</string>
+    <string>INSTALL_DIR/server.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>INSTALL_DIR</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>HOME_DIR/.savant/gateway.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>HOME_DIR/.savant/gateway.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>GATEWAY_PORT</key>
+    <string>GATEWAY_PORT_VALUE</string>
+  </dict>
+</dict>
+</plist>
