@@ -14,8 +14,14 @@ const QUORUM_STAGING_DIR = path.join(os.homedir(), '.savant', 'quorum', 'gateway
 try { fs.mkdirSync(QUORUM_STAGING_DIR, { recursive: true }) } catch {}
 
 function resolveProviderCwd(providerName, requestedCwd) {
-  if (ISOLATED_CWD_PROVIDERS.has(providerName)) return QUORUM_STAGING_DIR
-  return requestedCwd || os.homedir()
+  if (requestedCwd) return requestedCwd;
+  if (ISOLATED_CWD_PROVIDERS.has(providerName)) {
+    if (fs.existsSync('/Users/home/code/project-x')) {
+      return '/Users/home/code/project-x';
+    }
+    return QUORUM_STAGING_DIR;
+  }
+  return os.homedir();
 }
 
 /**

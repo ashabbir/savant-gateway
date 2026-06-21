@@ -22,6 +22,9 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
       cwd: cwd || os.homedir(),
       env: buildChildEnv({ GEMINI_CLI_TRUST_WORKSPACE: 'true' }),
     })
+    if (cmd !== 'agy') {
+      child.stdin.end()
+    }
 
     // Expose kill handle to caller before we await anything.
     onKill?.(() => {
@@ -43,7 +46,9 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
     })
 
     child.stderr.on('data', (data) => {
-      stderr += data.toString()
+      const chunk = data.toString()
+      stderr += chunk
+      onChunk?.(chunk)
     })
 
     child.on('close', () => {

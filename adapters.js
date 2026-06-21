@@ -43,6 +43,11 @@ const QUOTA_PATTERNS = [
 
 const isQuotaError = (res) => res && QUOTA_PATTERNS.some(re => re.test(res))
 
+function resolveModel(adapter, model) {
+  const requested = model || adapter.defaultModel
+  return adapter.modelAliases?.[requested] || requested
+}
+
 const ADAPTERS = {
   claude: {
     name: 'claude',
@@ -81,15 +86,15 @@ const ADAPTERS = {
     name: 'codex',
     label: 'Codex',
     baseArgv: ['codex', 'exec', '--sandbox', 'workspace-write', '--skip-git-repo-check'],
-    modelArgv: (model) => model ? ['--model', model] : [],
+    modelAliases: {
+      fast: 'gpt-5.5',
+    },
+    modelArgv: (model) => model ? ['--model', model, '-c', 'service_tier="fast"'] : [],
     promptArgv: (prompt) => [prompt],
-    defaultModel: 'o4-mini',
+    defaultModel: 'fast',
     availableModels: [
-      'o4-mini',
-      'gpt-5-mini',
-      'gpt-5',
-      'gpt-5-codex',
-      'o3',
+      'fast',
+      'gpt-5.5',
     ],
   },
   gemini: {
@@ -110,11 +115,22 @@ const ADAPTERS = {
     name: 'agy',
     label: 'AGY',
     baseArgv: ['agy', '-p', '--dangerously-skip-permissions'],
+    modelAliases: {
+      fast: 'Gemini 3.5 Flash (Low)',
+    },
     modelArgv: (model) => model ? ['--model', model] : [],
     promptArgv: (prompt) => [prompt],
-    defaultModel: 'default',
+    defaultModel: 'fast',
     availableModels: [
-      'default',
+      'fast',
+      'Gemini 3.5 Flash (Medium)',
+      'Gemini 3.5 Flash (High)',
+      'Gemini 3.5 Flash (Low)',
+      'Gemini 3.1 Pro (Low)',
+      'Gemini 3.1 Pro (High)',
+      'Claude Sonnet 4.6 (Thinking)',
+      'Claude Opus 4.6 (Thinking)',
+      'GPT-OSS 120B (Medium)',
     ],
   },
 }
@@ -143,16 +159,17 @@ const DEFAULT_CHAIN = [
   { provider: 'claude',  model: 'haiku' },
   { provider: 'copilot', model: 'claude-haiku-4.5' },
   { provider: 'gemini',  model: 'gemini-2.5-flash' },
-  { provider: 'agy',     model: 'default' },
-  { provider: 'codex',   model: 'o4-mini' },
+  { provider: 'agy',     model: 'fast' },
+  { provider: 'codex',   model: 'fast' },
 ].filter((step) => PROVIDER_NAMES.includes(step.provider))
 
 function buildArgv(step, prompt) {
   const adapter = ADAPTERS[step.provider]
   if (!adapter) throw new Error(`Unknown provider: ${step.provider}`)
+  const model = resolveModel(adapter, step.model)
   return [
     ...adapter.baseArgv,
-    ...adapter.modelArgv(step.model || adapter.defaultModel),
+    ...adapter.modelArgv(model),
     ...adapter.promptArgv(prompt),
   ]
 }
@@ -165,4 +182,5 @@ module.exports = {
   buildChildEnv,
   isQuotaError,
   buildArgv,
+  resolveModel,
 }
