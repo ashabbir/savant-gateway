@@ -22,9 +22,7 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
       cwd: cwd || os.homedir(),
       env: buildChildEnv({ GEMINI_CLI_TRUST_WORKSPACE: 'true' }),
     })
-    if (cmd !== 'agy') {
-      child.stdin.end()
-    }
+    child.stdin.end()
 
     // Expose kill handle to caller before we await anything.
     onKill?.(() => {

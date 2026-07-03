@@ -63,14 +63,31 @@ async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
       const providerCwd = resolveProviderCwd(step.provider, cwd)
       const response = await spawnAgent(argv, { onChunk, onKill, cwd: providerCwd })
 
-      if (isQuotaError(response)) {
-        onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: 'quota exhausted' })
-        lastError = new Error(`Quota exhausted on ${tag}`)
-        continue
+      const isErrorResponse = (res) => {
+        if (!res) return false
+        const lower = res.toLowerCase()
+        if (res.startsWith('Error:') || res.startsWith('ERROR:')) return true
+        
+        const errorPhrases = [
+          'not logged in',
+          'please run /login',
+          'no authentication information found',
+          'ineligibletiererror',
+          'usage limit',
+          'upgrade to pro',
+          'resource has been exhausted',
+          'critical error occurred',
+          'transport channel closed',
+          'quota exhausted',
+          'rate limit',
+          'authrequired'
+        ]
+        return errorPhrases.some(phrase => lower.includes(phrase))
       }
 
-      if (response.startsWith('Error:')) {
-        onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: response.slice(0, 120) })
+      if (isQuotaError(response) || isErrorResponse(response)) {
+        const errorReason = isQuotaError(response) ? 'quota exhausted' : response.slice(0, 120).trim()
+        onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: errorReason })
         lastError = new Error(response)
         continue
       }
