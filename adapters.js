@@ -114,12 +114,12 @@ const ADAPTERS = {
   agy: {
     name: 'agy',
     label: 'AGY',
-    baseArgv: ['agy', '-p'],
+    baseArgv: ['agy', '--dangerously-skip-permissions'],
     modelAliases: {
       fast: 'Gemini 3.5 Flash (Low)',
     },
     modelArgv: (model) => model ? ['--model', model] : [],
-    promptArgv: (prompt) => [prompt],
+    promptArgv: (prompt) => ['-p', prompt],
     defaultModel: 'fast',
     availableModels: [
       'fast',
