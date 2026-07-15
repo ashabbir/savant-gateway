@@ -1,7 +1,7 @@
 const express = require('express')
 const { randomUUID } = require('crypto') // built-in, no dep needed
 const { walkChain } = require('./chain')
-const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS } = require('./adapters')
+const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, refreshHermesModels } = require('./adapters')
 
 const app = express()
 app.use(express.json({ limit: '4mb' }))
@@ -34,6 +34,61 @@ function scheduleEvict(id) {
   setTimeout(() => runs.delete(id), EVICT_AFTER_MS)
 }
 
+function emit(run, event) {
+  run.events.push(event)
+  for (const client of run.subscribers) {
+    client.write(`data: ${JSON.stringify(event)}\n\n`)
+  }
+}
+
+function closeSubscribers(run) {
+  for (const client of run.subscribers) client.end()
+  run.subscribers.clear()
+}
+
+function steeringPrompt(prompt, feedback) {
+  if (feedback.length === 0) return prompt
+  return `${prompt}\n\n## User feedback received while you were responding\n${feedback.map((item) => `- ${item}`).join('\n')}\n\nRevise your approach and answer using this feedback.`
+}
+
+function executeRun(run) {
+  const prompt = steeringPrompt(run.prompt, run.feedback)
+  run.restartRequested = false
+  run.kill = null
+
+  walkChain(prompt, run.chain, {
+    onThinking: (t) => emit(run, { type: 'thinking', ...t }),
+    onChunk:    (c) => emit(run, { type: 'chunk', content: c }),
+    onKill:     (fn) => { run.kill = fn },
+    cwd:        run.cwd,
+  }).then(({ response, step }) => {
+    if (run.restartRequested && !run.cancelled) {
+      executeRun(run)
+      return
+    }
+    if (run.cancelled) return
+    run.status = 'complete'
+    run.result = { response, provider: step.provider, model: step.model }
+    emit(run, { type: 'complete', content: response, provider: step.provider, model: step.model })
+    closeSubscribers(run)
+    scheduleEvict(run.id)
+  }).catch((err) => {
+    if (run.restartRequested && !run.cancelled && err.message === 'KILLED_BY_CLIENT') {
+      executeRun(run)
+      return
+    }
+    if (err.message === 'KILLED_BY_CLIENT') {
+      run.status = 'killed'
+    } else {
+      run.status = 'error'
+      run.error = err.message
+    }
+    emit(run, { type: 'error', message: err.message })
+    closeSubscribers(run)
+    scheduleEvict(run.id)
+  })
+}
+
 // ── POST /runs ────────────────────────────────────────────────────────────────
 // Body: { prompt: string, chain?: ChainStep[], model?: string }
 // Returns: { id: string, status: 'running' }
@@ -61,39 +116,26 @@ app.post('/runs', (req, res) => {
     result: null,
     error: null,
     events: [],
+    subscribers: new Set(),
     kill: null,
+    prompt,
+    chain: activeChain,
+    feedback: [],
+    restartRequested: false,
+    cancelled: false,
     startedAt: Date.now(),
     cwd: runCwd,
   }
   runs.set(id, run)
 
-  // Fire-and-forget — the SSE endpoint drains `run.events` as they arrive.
-  walkChain(prompt, activeChain, {
-    onThinking: (t) => run.events.push({ type: 'thinking', ...t }),
-    onChunk:    (c) => run.events.push({ type: 'chunk', content: c }),
-    onKill:     (fn) => { run.kill = fn },
-    cwd:        runCwd,
-  }).then(({ response, step }) => {
-    run.status = 'complete'
-    run.result = { response, provider: step.provider, model: step.model }
-    run.events.push({ type: 'complete', content: response, provider: step.provider, model: step.model })
-    scheduleEvict(id)
-  }).catch((err) => {
-    if (err.message === 'KILLED_BY_CLIENT') {
-      run.status = 'killed'
-    } else {
-      run.status = 'error'
-      run.error = err.message
-    }
-    run.events.push({ type: 'error', message: err.message })
-    scheduleEvict(id)
-  })
+  // Fire-and-forget — active SSE consumers receive events immediately.
+  executeRun(run)
 
   res.status(202).json({ id, status: 'running' })
 })
 
 // ── GET /runs/:id/stream ──────────────────────────────────────────────────────
-// SSE stream. Emits events from run.events as they arrive.
+// SSE stream. Replays buffered events, then receives new events immediately.
 // Each event: `data: <json>\n\n`
 // Closes when the run reaches a terminal state.
 app.get('/runs/:id/stream', (req, res) => {
@@ -105,23 +147,14 @@ app.get('/runs/:id/stream', (req, res) => {
   res.setHeader('Connection', 'keep-alive')
   res.flushHeaders()
 
-  let cursor = 0
   const TERMINAL = new Set(['complete', 'error', 'killed'])
-
-  const flush = () => {
-    while (cursor < run.events.length) {
-      res.write(`data: ${JSON.stringify(run.events[cursor++])}\n\n`)
-    }
-    if (TERMINAL.has(run.status)) {
-      clearInterval(timer)
-      res.end()
-    }
+  for (const event of run.events) {
+    res.write(`data: ${JSON.stringify(event)}\n\n`)
   }
+  if (TERMINAL.has(run.status)) return res.end()
 
-  const timer = setInterval(flush, 40)
-  flush()
-
-  req.on('close', () => clearInterval(timer))
+  run.subscribers.add(res)
+  req.on('close', () => run.subscribers.delete(res))
 })
 
 // ── GET /runs/:id ─────────────────────────────────────────────────────────────
@@ -139,9 +172,30 @@ app.delete('/runs/:id', (req, res) => {
   if (!run) return res.status(404).json({ error: 'run not found' })
   if (run.status !== 'running') return res.json({ ok: true, note: `already ${run.status}` })
 
+  run.cancelled = true
   run.kill?.()
   // status + event will be set by the chain walker's catch block.
   res.json({ ok: true })
+})
+
+// ── POST /runs/:id/feedback ──────────────────────────────────────────────────
+// One-shot CLI providers cannot safely consume a second prompt on stdin. Stop
+// the active process and restart it with the original prompt plus all feedback.
+app.post('/runs/:id/feedback', (req, res) => {
+  const run = runs.get(req.params.id)
+  if (!run) return res.status(404).json({ error: 'run not found' })
+  if (run.status !== 'running') return res.status(409).json({ error: `run is ${run.status}` })
+
+  const { feedback } = req.body || {}
+  if (!feedback || typeof feedback !== 'string' || !feedback.trim()) {
+    return res.status(400).json({ error: 'feedback (non-empty string) is required' })
+  }
+
+  run.feedback.push(feedback.trim())
+  run.restartRequested = true
+  emit(run, { type: 'steering', feedback: feedback.trim(), restart: true })
+  run.kill?.()
+  res.status(202).json({ id: run.id, status: 'steering', feedbackCount: run.feedback.length })
 })
 
 // ── GET /runs ─────────────────────────────────────────────────────────────────
@@ -199,6 +253,7 @@ app.get('/runs/:id/events', (req, res) => {
 // ── GET /models ──────────────────────────────────────────────────────────────
 // List all defined providers and their models, indicating if they are enabled.
 app.get('/models', (_req, res) => {
+  refreshHermesModels()
   const providers = Object.keys(ADAPTERS).map((id) => {
     const adapter = ADAPTERS[id]
     return {
@@ -215,6 +270,7 @@ app.get('/models', (_req, res) => {
 
 // ── GET /health ───────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
+  refreshHermesModels()
   res.json({
     ok: true,
     service: 'savant-gateway',

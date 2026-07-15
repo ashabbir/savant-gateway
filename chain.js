@@ -8,7 +8,7 @@ const { spawnAgent } = require('./runner')
 // Copilot CLI records each invocation and shows it when the user opens the
 // CLI in that directory). Running them in a Quorum-internal staging dir
 // keeps the user's project directories clean.
-const ISOLATED_CWD_PROVIDERS = new Set(['copilot', 'codex', 'gemini', 'agy'])
+const ISOLATED_CWD_PROVIDERS = new Set(['copilot', 'codex', 'gemini', 'agy', 'hermes'])
 
 const QUORUM_STAGING_DIR = path.join(os.homedir(), '.savant', 'quorum', 'gateway-staging')
 try { fs.mkdirSync(QUORUM_STAGING_DIR, { recursive: true }) } catch {}

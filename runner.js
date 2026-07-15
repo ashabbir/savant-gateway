@@ -2,7 +2,9 @@ const { spawn } = require('child_process')
 const os = require('os')
 const { buildChildEnv } = require('./adapters')
 
-const HARD_TIMEOUT_MS = 300_000
+// Five-minute failed attempts make a fallback chain feel unresponsive. Keep
+// the value configurable for longer coding tasks without baking that delay in.
+const HARD_TIMEOUT_MS = Number(process.env.GATEWAY_PROVIDER_TIMEOUT_MS) || 90_000
 
 /**
  * Spawn a CLI agent and return a promise that resolves to its full stdout.

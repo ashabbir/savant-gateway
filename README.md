@@ -6,7 +6,7 @@ Host-native AI provider gateway for the Savant ecosystem.
 
 ## Features
 
-- **Unified API**: Single interface for multiple AI CLI agents: Claude, Copilot, Codex, Gemini, and AGY.
+- **Unified API**: Single interface for multiple AI CLI agents: Claude, Copilot, Codex, Gemini, AGY, and Hermes.
 - **Failover Chaining**: Automatically falls back to the next provider in the chain if the primary hits a quota or fails.
 - **SSE Streaming**: Real-time streaming of thinking steps, status updates, and response chunks.
 - **Host-Native Execution**: Spawns agents directly on your machine, leveraging your local credentials and environment.
@@ -24,6 +24,7 @@ The gateway probes your `PATH` for the following CLI tools:
 | **Codex** | `codex` | Codex CLI agent. |
 | **Gemini** | `gemini` | Google Gemini CLI. |
 | **AGY** | `agy` | AGY CLI agent. |
+| **Hermes** | `hermes` | Hermes Agent, executed with its non-interactive `--oneshot` mode. The default uses Hermes's selected provider/model; authenticated override models are discovered dynamically. |
 
 ## Prerequisites
 
@@ -90,6 +91,17 @@ Poll for the current status and result of a run.
 ### `DELETE /runs/:id`
 Kill an in-flight run.
 
+### `POST /runs/:id/feedback`
+Steer an in-flight run with a new user message.
+
+```json
+{ "feedback": "Use the existing auth flow instead." }
+```
+
+The gateway emits a `steering` SSE event, stops the current one-shot CLI
+invocation, and restarts it with the original prompt plus all feedback received
+for the run. This avoids relying on incompatible interactive stdin protocols.
+
 ### `GET /models`
 List all supported providers and their available models, including whether they are currently enabled on your system.
 
@@ -101,6 +113,8 @@ Returns service status, uptime, and active providers.
 The gateway can be configured using environment variables:
 
 - `GATEWAY_PORT`: The port to listen on (default: `3100`).
+- `GATEWAY_PROVIDER_TIMEOUT_MS`: Maximum time for one provider attempt before
+  fallback (default: `90000`).
 
 ## Service Management
 

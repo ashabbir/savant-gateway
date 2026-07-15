@@ -1,5 +1,6 @@
 const os = require('os')
 const path = require('path')
+const fs = require('fs')
 const { spawnSync } = require('child_process')
 
 // Same PATH augmentation as Quorum's main.ts — GUI-launched processes don't
@@ -45,7 +46,38 @@ const isQuotaError = (res) => res && QUOTA_PATTERNS.some(re => re.test(res))
 
 function resolveModel(adapter, model) {
   const requested = model || adapter.defaultModel
-  return adapter.modelAliases?.[requested] || requested
+  if (requested && Object.hasOwn(adapter.modelAliases || {}, requested)) {
+    return adapter.modelAliases[requested]
+  }
+  return requested
+}
+
+const HERMES_PYTHON = process.env.HERMES_PYTHON || path.join(
+  os.homedir(), '.hermes', 'hermes-agent', 'venv', 'bin', 'python',
+)
+
+// Hermes owns provider authentication and model discovery. Its local API
+// returns only providers with usable credentials, including the account-aware
+// Codex OAuth catalog. Prefix every model with its provider so the adapter can
+// route it back to Hermes without guessing from a model name.
+function discoverHermesModels() {
+  if (!fs.existsSync(HERMES_PYTHON)) return []
+
+  const probe = spawnSync(HERMES_PYTHON, ['-c', [
+    'import json',
+    'from hermes_cli.model_switch import list_authenticated_providers',
+    'print(json.dumps(list_authenticated_providers(max_models=100)))',
+  ].join('; ')], { encoding: 'utf8', timeout: 5_000 })
+
+  if (probe.status !== 0 || !probe.stdout) return []
+  try {
+    const providers = JSON.parse(probe.stdout)
+    return providers.flatMap((provider) => (provider.models || []).map(
+      (model) => `${provider.slug}/${model}`,
+    ))
+  } catch {
+    return []
+  }
 }
 
 const ADAPTERS = {
@@ -133,9 +165,39 @@ const ADAPTERS = {
       'GPT-OSS 120B (Medium)',
     ],
   },
+  hermes: {
+    name: 'hermes',
+    label: 'Hermes',
+    // --oneshot writes only the final answer to stdout, which is the stable
+    // non-interactive contract Hermes documents for scripts and pipes.
+    baseArgv: ['hermes', '--yolo'],
+    modelArgv: (model) => {
+      if (!model || model === 'configured') return []
+      const separator = model.indexOf('/')
+      if (separator === -1) return ['--model', model]
+      return [
+        '--provider', model.slice(0, separator),
+        '--model', model.slice(separator + 1),
+      ]
+    },
+    promptArgv: (prompt) => ['--oneshot', prompt],
+    // Use the user's active Hermes selection by default. Discovered choices
+    // are explicit overrides only; they must never replace config.yaml.
+    defaultModel: 'configured',
+    availableModels: ['configured'],
+  },
 }
 
-const ALL_PROVIDER_NAMES = ['claude', 'copilot', 'codex', 'gemini', 'agy']
+function refreshHermesModels() {
+  const models = discoverHermesModels()
+  ADAPTERS.hermes.availableModels = ['configured', ...models]
+  ADAPTERS.hermes.defaultModel = 'configured'
+  return ADAPTERS.hermes
+}
+
+refreshHermesModels()
+
+const ALL_PROVIDER_NAMES = ['claude', 'copilot', 'codex', 'gemini', 'agy', 'hermes']
 
 function isCommandAvailable(command) {
   const probe = spawnSync('which', [command], {
@@ -156,11 +218,14 @@ const DISABLED_PROVIDERS = ALL_PROVIDER_NAMES.filter(
 )
 
 const DEFAULT_CHAIN = [
+  // Keep the normal path fast even when the user's optional Hermes selection
+  // is temporarily unavailable. Explicit Hermes requests still use config.
+  { provider: 'codex',   model: 'fast' },
+  { provider: 'hermes',  model: ADAPTERS.hermes.defaultModel },
   { provider: 'claude',  model: 'haiku' },
   { provider: 'copilot', model: 'claude-haiku-4.5' },
   { provider: 'gemini',  model: 'gemini-2.5-flash' },
   { provider: 'agy',     model: 'fast' },
-  { provider: 'codex',   model: 'fast' },
 ].filter((step) => PROVIDER_NAMES.includes(step.provider))
 
 function buildArgv(step, prompt) {
@@ -182,5 +247,7 @@ module.exports = {
   buildChildEnv,
   isQuotaError,
   buildArgv,
+  discoverHermesModels,
+  refreshHermesModels,
   resolveModel,
 }
