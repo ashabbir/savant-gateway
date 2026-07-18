@@ -66,7 +66,9 @@ function discoverHermesModels() {
   const probe = spawnSync(HERMES_PYTHON, ['-c', [
     'import json',
     'from hermes_cli.model_switch import list_authenticated_providers',
-    'print(json.dumps(list_authenticated_providers(max_models=100)))',
+    // Do not truncate the authenticated provider catalog. OpenAI accounts can
+    // expose more models than the old fixed 100-item gateway limit.
+    'print(json.dumps(list_authenticated_providers(max_models=10000)))',
   ].join('; ')], { encoding: 'utf8', timeout: 5_000 })
 
   if (probe.status !== 0 || !probe.stdout) return []
@@ -78,6 +80,33 @@ function discoverHermesModels() {
   } catch {
     return []
   }
+}
+
+function discoverCodexModels() {
+  const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex')
+  const cachePath = path.join(codexHome, 'models_cache.json')
+  try {
+    const payload = JSON.parse(fs.readFileSync(cachePath, 'utf8'))
+    const models = Array.isArray(payload.models) ? payload.models : []
+    const ids = models
+      .filter((model) => model && typeof model.slug === 'string')
+      .filter((model) => !['hide', 'hidden'].includes(String(model.visibility || '').toLowerCase()))
+      .map((model) => model.slug.trim())
+      .filter(Boolean)
+    return [...new Set(ids)]
+  } catch {
+    return []
+  }
+}
+
+function discoverAgyModels() {
+  const probe = spawnSync('agy', ['models'], {
+    env: buildChildEnv(),
+    encoding: 'utf8',
+    timeout: 5_000,
+  })
+  if (probe.status !== 0 || !probe.stdout) return []
+  return [...new Set(probe.stdout.split(/\r?\n/).map((model) => model.trim()).filter(Boolean))]
 }
 
 const ADAPTERS = {
@@ -195,7 +224,20 @@ function refreshHermesModels() {
   return ADAPTERS.hermes
 }
 
+function refreshLocalModels() {
+  const codexModels = discoverCodexModels()
+  if (codexModels.length > 0) {
+    ADAPTERS.codex.availableModels = codexModels
+  }
+  const agyModels = discoverAgyModels()
+  if (agyModels.length > 0) {
+    ADAPTERS.agy.availableModels = agyModels
+  }
+  return { codex: ADAPTERS.codex, agy: ADAPTERS.agy }
+}
+
 refreshHermesModels()
+refreshLocalModels()
 
 const ALL_PROVIDER_NAMES = ['claude', 'copilot', 'codex', 'gemini', 'agy', 'hermes']
 
@@ -249,5 +291,8 @@ module.exports = {
   buildArgv,
   discoverHermesModels,
   refreshHermesModels,
+  discoverCodexModels,
+  discoverAgyModels,
+  refreshLocalModels,
   resolveModel,
 }

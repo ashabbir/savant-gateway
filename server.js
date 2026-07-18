@@ -1,7 +1,7 @@
 const express = require('express')
 const { randomUUID } = require('crypto') // built-in, no dep needed
 const { walkChain } = require('./chain')
-const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, refreshHermesModels } = require('./adapters')
+const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, refreshHermesModels, refreshLocalModels } = require('./adapters')
 
 const app = express()
 app.use(express.json({ limit: '4mb' }))
@@ -254,6 +254,7 @@ app.get('/runs/:id/events', (req, res) => {
 // List all defined providers and their models, indicating if they are enabled.
 app.get('/models', (_req, res) => {
   refreshHermesModels()
+  refreshLocalModels()
   const providers = Object.keys(ADAPTERS).map((id) => {
     const adapter = ADAPTERS[id]
     return {
@@ -271,6 +272,7 @@ app.get('/models', (_req, res) => {
 // ── GET /health ───────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   refreshHermesModels()
+  refreshLocalModels()
   res.json({
     ok: true,
     service: 'savant-gateway',
