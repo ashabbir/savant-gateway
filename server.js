@@ -1,7 +1,8 @@
 const express = require('express')
 const { randomUUID } = require('crypto') // built-in, no dep needed
-const { walkChain } = require('./chain')
-const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, refreshHermesModels, refreshLocalModels } = require('./adapters')
+const { walkChain, raceChain } = require('./chain')
+const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh } = require('./adapters')
+const { upload, buildPromptWithFiles, cleanupFiles, MAX_FILES, MAX_FILE_BYTES } = require('./uploads')
 
 const app = express()
 app.use(express.json({ limit: '4mb' }))
@@ -53,30 +54,27 @@ function steeringPrompt(prompt, feedback) {
 
 function executeRun(run) {
   const prompt = steeringPrompt(run.prompt, run.feedback)
-  run.restartRequested = false
   run.kill = null
+  const generation = ++run.generation
+  const execute = run.execution === 'serial' ? walkChain : raceChain
 
-  walkChain(prompt, run.chain, {
+  execute(prompt, run.chain, {
     onThinking: (t) => emit(run, { type: 'thinking', ...t }),
     onChunk:    (c) => emit(run, { type: 'chunk', content: c }),
     onKill:     (fn) => { run.kill = fn },
     cwd:        run.cwd,
+    concurrency: run.concurrency,
+    staggerMs: run.staggerMs,
   }).then(({ response, step }) => {
-    if (run.restartRequested && !run.cancelled) {
-      executeRun(run)
-      return
-    }
-    if (run.cancelled) return
+    if (run.cancelled || generation !== run.generation) return
     run.status = 'complete'
     run.result = { response, provider: step.provider, model: step.model }
     emit(run, { type: 'complete', content: response, provider: step.provider, model: step.model })
     closeSubscribers(run)
+    cleanupFiles(run.files)
     scheduleEvict(run.id)
   }).catch((err) => {
-    if (run.restartRequested && !run.cancelled && err.message === 'KILLED_BY_CLIENT') {
-      executeRun(run)
-      return
-    }
+    if (generation !== run.generation) return
     if (err.message === 'KILLED_BY_CLIENT') {
       run.status = 'killed'
     } else {
@@ -85,6 +83,7 @@ function executeRun(run) {
     }
     emit(run, { type: 'error', message: err.message })
     closeSubscribers(run)
+    cleanupFiles(run.files)
     scheduleEvict(run.id)
   })
 }
@@ -92,15 +91,25 @@ function executeRun(run) {
 // ── POST /runs ────────────────────────────────────────────────────────────────
 // Body: { prompt: string, chain?: ChainStep[], model?: string }
 // Returns: { id: string, status: 'running' }
-app.post('/runs', (req, res) => {
-  const { prompt, chain, cwd, session_id } = req.body || {}
+app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
+  const { prompt, cwd, session_id, execution } = req.body || {}
   if (!prompt || typeof prompt !== 'string') {
+    cleanupFiles(req.files)
     return res.status(400).json({ error: 'prompt (string) is required' })
+  }
+
+  let chain = req.body?.chain
+  if (typeof chain === 'string') {
+    try { chain = JSON.parse(chain) } catch {
+      cleanupFiles(req.files)
+      return res.status(400).json({ error: 'chain must be valid JSON' })
+    }
   }
 
   const requestedChain = Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
   const activeChain = requestedChain.filter((step) => PROVIDER_NAMES.includes(step.provider))
   if (activeChain.length === 0) {
+    cleanupFiles(req.files)
     return res.status(503).json({
       error: 'NO_PROVIDERS_AVAILABLE',
       providers: PROVIDER_NAMES,
@@ -109,6 +118,7 @@ app.post('/runs', (req, res) => {
 
   const id = randomUUID()
   const runCwd = typeof cwd === 'string' && cwd ? cwd : undefined
+  const requestedStagger = req.body?.stagger_ms ?? process.env.GATEWAY_RACE_STAGGER_MS ?? 250
   const run = {
     id,
     session_id: typeof session_id === 'string' ? session_id : null,
@@ -118,11 +128,15 @@ app.post('/runs', (req, res) => {
     events: [],
     subscribers: new Set(),
     kill: null,
-    prompt,
+    prompt: buildPromptWithFiles(prompt, req.files),
+    files: req.files || [],
     chain: activeChain,
     feedback: [],
-    restartRequested: false,
     cancelled: false,
+    generation: 0,
+    execution: execution === 'serial' ? 'serial' : 'race',
+    concurrency: Math.max(1, Math.min(Number(req.body?.concurrency) || Number(process.env.GATEWAY_RACE_CONCURRENCY) || 2, 6)),
+    staggerMs: Math.max(0, Number(requestedStagger) || 0),
     startedAt: Date.now(),
     cwd: runCwd,
   }
@@ -173,8 +187,13 @@ app.delete('/runs/:id', (req, res) => {
   if (run.status !== 'running') return res.json({ ok: true, note: `already ${run.status}` })
 
   run.cancelled = true
+  run.generation++
   run.kill?.()
-  // status + event will be set by the chain walker's catch block.
+  run.status = 'killed'
+  emit(run, { type: 'error', message: 'KILLED_BY_CLIENT' })
+  closeSubscribers(run)
+  cleanupFiles(run.files)
+  scheduleEvict(run.id)
   res.json({ ok: true })
 })
 
@@ -192,9 +211,9 @@ app.post('/runs/:id/feedback', (req, res) => {
   }
 
   run.feedback.push(feedback.trim())
-  run.restartRequested = true
   emit(run, { type: 'steering', feedback: feedback.trim(), restart: true })
   run.kill?.()
+  executeRun(run)
   res.status(202).json({ id: run.id, status: 'steering', feedbackCount: run.feedback.length })
 })
 
@@ -253,8 +272,7 @@ app.get('/runs/:id/events', (req, res) => {
 // ── GET /models ──────────────────────────────────────────────────────────────
 // List all defined providers and their models, indicating if they are enabled.
 app.get('/models', (_req, res) => {
-  refreshHermesModels()
-  refreshLocalModels()
+  scheduleModelRefresh()
   const providers = Object.keys(ADAPTERS).map((id) => {
     const adapter = ADAPTERS[id]
     return {
@@ -271,8 +289,7 @@ app.get('/models', (_req, res) => {
 
 // ── GET /health ───────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  refreshHermesModels()
-  refreshLocalModels()
+  scheduleModelRefresh()
   res.json({
     ok: true,
     service: 'savant-gateway',
@@ -289,8 +306,20 @@ app.get('/health', (_req, res) => {
     }),
     disabledProviders: DISABLED_PROVIDERS,
     activeRuns: [...runs.values()].filter(r => r.status === 'running').length,
+    execution: {
+      default: 'race',
+      concurrency: Number(process.env.GATEWAY_RACE_CONCURRENCY) || 2,
+      staggerMs: Number(process.env.GATEWAY_RACE_STAGGER_MS) || 250,
+    },
+    uploads: { maxFiles: MAX_FILES, maxFileBytes: MAX_FILE_BYTES },
     uptime: process.uptime(),
   })
+})
+
+app.use((err, _req, res, _next) => {
+  if (err?.name === 'MulterError') return res.status(413).json({ error: err.code, message: err.message })
+  console.error('[gateway] request error', err)
+  res.status(500).json({ error: 'INTERNAL_ERROR' })
 })
 
 // ── Start ─────────────────────────────────────────────────────────────────────

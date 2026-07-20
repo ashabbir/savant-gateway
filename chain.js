@@ -36,7 +36,7 @@ function resolveProviderCwd(providerName, requestedCwd) {
  * Throws  'ALL_PROVIDERS_EXHAUSTED' if every step fails.
  */
 async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
-  const { onThinking, onChunk, onKill, cwd } = callbacks
+  const { onThinking, onChunk, onKill, cwd, spawnAgent: spawn = spawnAgent } = callbacks
   const steps = Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
   let lastError = null
 
@@ -61,31 +61,9 @@ async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
 
     try {
       const providerCwd = resolveProviderCwd(step.provider, cwd)
-      const response = await spawnAgent(argv, { onChunk, onKill, cwd: providerCwd })
+      const response = await spawn(argv, { onChunk, onKill, cwd: providerCwd })
 
-      const isErrorResponse = (res) => {
-        if (!res) return false
-        const lower = res.toLowerCase()
-        if (res.startsWith('Error:') || res.startsWith('ERROR:')) return true
-        
-        const errorPhrases = [
-          'not logged in',
-          'please run /login',
-          'no authentication information found',
-          'ineligibletiererror',
-          'usage limit',
-          'upgrade to pro',
-          'resource has been exhausted',
-          'critical error occurred',
-          'transport channel closed',
-          'quota exhausted',
-          'rate limit',
-          'authrequired'
-        ]
-        return errorPhrases.some(phrase => lower.includes(phrase))
-      }
-
-      if (isQuotaError(response) || isErrorResponse(response)) {
+      if (isQuotaError(response) || invalidResponse(response)) {
         const errorReason = isQuotaError(response) ? 'quota exhausted' : response.slice(0, 120).trim()
         onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: errorReason })
         lastError = new Error(response)
@@ -108,4 +86,126 @@ async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
   throw new Error(`ALL_PROVIDERS_EXHAUSTED. Last: ${lastError?.message || 'unknown'}`)
 }
 
-module.exports = { walkChain }
+function invalidResponse(response) {
+  if (!response || !response.trim()) return true
+  const lower = response.toLowerCase()
+  if (response.startsWith('Error:') || response.startsWith('ERROR:')) return true
+  return [
+    'not logged in', 'please run /login', 'no authentication information found',
+    'ineligibletiererror', 'usage limit', 'upgrade to pro',
+    'resource has been exhausted', 'critical error occurred',
+    'transport channel closed', 'quota exhausted', 'rate limit', 'authrequired',
+    'flags provided but not defined:', 'unknown option',
+  ].some((phrase) => lower.includes(phrase))
+}
+
+/** Race a bounded number of isolated provider subprocesses. The first valid
+ * response wins and every losing process is cancelled. Chunks are buffered so
+ * clients never receive a mixed response from losing providers. */
+function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
+  const steps = Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
+  const concurrency = Math.max(1, Math.min(Number(callbacks.concurrency) || 2, steps.length, 6))
+  const staggerMs = Math.max(0, Number(callbacks.staggerMs) || 0)
+  const spawn = callbacks.spawnAgent || spawnAgent
+
+  return new Promise((resolve, reject) => {
+    const activeKills = new Map()
+    const launchTimers = new Set()
+    let nextIndex = 0
+    let active = 0
+    let finished = 0
+    let settled = false
+    let lastError = null
+
+    const killAll = () => {
+      for (const timer of launchTimers) clearTimeout(timer)
+      launchTimers.clear()
+      for (const kill of activeKills.values()) kill()
+      activeKills.clear()
+    }
+    callbacks.onKill?.(killAll)
+
+    const maybeFinish = () => {
+      if (!settled && finished === steps.length) {
+        settled = true
+        reject(new Error(`ALL_PROVIDERS_EXHAUSTED. Last: ${lastError?.message || 'unknown'}`))
+      }
+    }
+
+    const launch = (step, index) => {
+      if (settled) return
+      const adapter = ADAPTERS[step.provider]
+      if (!adapter) {
+        active--
+        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag: step.provider, status: 'skip', reason: 'unknown provider' })
+        finished++
+        maybeFinish()
+        return
+      }
+      const tag = step.model ? `${adapter.label}:${step.model}` : adapter.label
+      callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending', parallel: true })
+      let argv
+      try { argv = buildArgv(step, prompt) } catch (error) {
+        active--
+        lastError = error
+        finished++
+        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: error.message })
+        pump()
+        return
+      }
+      const chunks = []
+      spawn(argv, {
+        cwd: resolveProviderCwd(step.provider, callbacks.cwd),
+        onChunk: (chunk) => chunks.push(chunk),
+        onKill: (kill) => activeKills.set(index, kill),
+      }).then((response) => {
+        active--
+        finished++
+        activeKills.delete(index)
+        if (settled) return
+        if (isQuotaError(response) || invalidResponse(response)) {
+          lastError = new Error(response || 'empty provider response')
+          callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: lastError.message.slice(0, 120) })
+          pump()
+          maybeFinish()
+          return
+        }
+        settled = true
+        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
+        killAll()
+        for (const chunk of chunks) callbacks.onChunk?.(chunk)
+        resolve({ response, step })
+      }).catch((error) => {
+        active--
+        finished++
+        activeKills.delete(index)
+        if (settled) return
+        if (error.message === 'KILLED_BY_CLIENT') {
+          settled = true
+          killAll()
+          reject(error)
+          return
+        }
+        lastError = error
+        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: error.message })
+        pump()
+        maybeFinish()
+      })
+    }
+
+    const pump = () => {
+      while (!settled && active < concurrency && nextIndex < steps.length) {
+        const index = nextIndex++
+        active++
+        let timer = null
+        const start = () => { launchTimers.delete(timer); launch(steps[index], index) }
+        const delay = staggerMs * index
+        if (delay > 0) { timer = setTimeout(start, delay); launchTimers.add(timer) } else start()
+      }
+      maybeFinish()
+    }
+    pump()
+  })
+}
+
+module.exports = { walkChain, raceChain }

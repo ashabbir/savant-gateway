@@ -9,6 +9,9 @@ Host-native AI provider gateway for the Savant ecosystem.
 - **Unified API**: Single interface for multiple AI CLI agents: Claude, Copilot, Codex, Gemini, AGY, and Hermes.
 - **Failover Chaining**: Automatically falls back to the next provider in the chain if the primary hits a quota or fails.
 - **SSE Streaming**: Real-time streaming of thinking steps, status updates, and response chunks.
+- **Fast provider racing**: Bounded parallel subprocesses return the first valid provider response and cancel slower attempts.
+- **File uploads**: Multipart runs can attach local files for agents to inspect.
+- **Live steering**: New feedback cancels stale work and immediately restarts with accumulated guidance.
 - **Host-Native Execution**: Spawns agents directly on your machine, leveraging your local credentials and environment.
 - **macOS Integration**: Easy installation as a `launchd` background service.
 - **Security**: Bound to `127.0.0.1` and restricted to local origins by default.
@@ -53,7 +56,7 @@ By default, the gateway listens on `http://127.0.0.1:3100`.
 ### `POST /runs`
 Starts a new AI run.
 
-**Request Body:**
+**JSON request:**
 ```json
 {
   "prompt": "Write a hello world in Rust",
@@ -61,12 +64,26 @@ Starts a new AI run.
     { "provider": "claude", "model": "sonnet" },
     { "provider": "gemini", "model": "gemini-2.0-flash" }
   ],
-  "cwd": "/path/to/workdir"
+  "cwd": "/path/to/workdir",
+  "execution": "race",
+  "concurrency": 2
 }
 ```
 - `prompt` (required): The prompt string.
 - `chain` (optional): An array of provider steps to try in order. Defaults to a pre-defined fallback chain.
 - `cwd` (optional): The working directory for the spawned agent.
+- `execution` (optional): `race` (default) or `serial`.
+- `concurrency` (optional): Provider subprocess limit for race mode (1–6).
+
+Files can be attached using multipart form data. `chain` must be JSON when
+sent as a form field:
+
+```bash
+curl -F 'prompt=Summarize the attached files' \
+  -F 'files=@./report.pdf' \
+  -F 'files=@./notes.txt' \
+  http://127.0.0.1:3100/runs
+```
 
 **Response:**
 ```json
@@ -115,6 +132,11 @@ The gateway can be configured using environment variables:
 - `GATEWAY_PORT`: The port to listen on (default: `3100`).
 - `GATEWAY_PROVIDER_TIMEOUT_MS`: Maximum time for one provider attempt before
   fallback (default: `90000`).
+- `GATEWAY_RACE_CONCURRENCY`: Default parallel provider limit (default: `2`, max: `6`).
+- `GATEWAY_RACE_STAGGER_MS`: Delay before speculative fallback starts (default: `250`).
+- `GATEWAY_MODEL_REFRESH_TTL_MS`: Model discovery cache duration (default: `60000`).
+- `GATEWAY_MAX_FILES`: Maximum uploads per run (default: `10`).
+- `GATEWAY_MAX_FILE_BYTES`: Maximum bytes per uploaded file (default: `26214400`).
 
 ## Service Management
 

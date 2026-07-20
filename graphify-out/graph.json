@@ -34,10 +34,20 @@
       "norm_label": "path"
     },
     {
-      "label": "{ spawnSync }",
+      "label": "fs",
       "file_type": "code",
       "source_file": "adapters.js",
       "source_location": "L3",
+      "_origin": "ast",
+      "id": "adapters_fs",
+      "community": 1,
+      "norm_label": "fs"
+    },
+    {
+      "label": "{ spawnSync }",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L4",
       "_origin": "ast",
       "id": "adapters_spawnsync",
       "community": 1,
@@ -47,7 +57,7 @@
       "label": "EXTRA_PATH_DIRS",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L7",
+      "source_location": "L8",
       "_origin": "ast",
       "id": "adapters_extra_path_dirs",
       "community": 1,
@@ -57,7 +67,7 @@
       "label": "buildChildEnv()",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L19",
+      "source_location": "L20",
       "_origin": "ast",
       "id": "adapters_buildchildenv",
       "community": 1,
@@ -67,7 +77,7 @@
       "label": "QUOTA_PATTERNS",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L32",
+      "source_location": "L33",
       "_origin": "ast",
       "id": "adapters_quota_patterns",
       "community": 1,
@@ -77,27 +87,107 @@
       "label": "isQuotaError()",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L44",
+      "source_location": "L45",
       "_origin": "ast",
       "id": "adapters_isquotaerror",
       "community": 0,
       "norm_label": "isquotaerror()"
     },
     {
+      "label": "resolveModel()",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L47",
+      "_origin": "ast",
+      "id": "adapters_resolvemodel",
+      "community": 1,
+      "norm_label": "resolvemodel()"
+    },
+    {
+      "label": "discoverHermesModels()",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L63",
+      "_origin": "ast",
+      "id": "adapters_discoverhermesmodels",
+      "community": 1,
+      "norm_label": "discoverhermesmodels()"
+    },
+    {
+      "label": "discoverCodexModels()",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L85",
+      "_origin": "ast",
+      "id": "adapters_discovercodexmodels",
+      "community": 1,
+      "norm_label": "discovercodexmodels()"
+    },
+    {
+      "label": "discoverAgyModels()",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L102",
+      "_origin": "ast",
+      "id": "adapters_discoveragymodels",
+      "community": 1,
+      "norm_label": "discoveragymodels()"
+    },
+    {
       "label": "ADAPTERS",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L46",
+      "source_location": "L112",
       "_origin": "ast",
       "id": "adapters_adapters",
       "community": 0,
       "norm_label": "adapters"
     },
     {
+      "label": "refreshHermesModels()",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L220",
+      "_origin": "ast",
+      "id": "adapters_refreshhermesmodels",
+      "community": 1,
+      "norm_label": "refreshhermesmodels()"
+    },
+    {
+      "label": "refreshLocalModels()",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L227",
+      "_origin": "ast",
+      "id": "adapters_refreshlocalmodels",
+      "community": 1,
+      "norm_label": "refreshlocalmodels()"
+    },
+    {
+      "label": "lastModelRefresh",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L243",
+      "_origin": "ast",
+      "id": "adapters_lastmodelrefresh",
+      "community": 1,
+      "norm_label": "lastmodelrefresh"
+    },
+    {
+      "label": "scheduleModelRefresh()",
+      "file_type": "code",
+      "source_file": "adapters.js",
+      "source_location": "L245",
+      "_origin": "ast",
+      "id": "adapters_schedulemodelrefresh",
+      "community": 1,
+      "norm_label": "schedulemodelrefresh()"
+    },
+    {
       "label": "ALL_PROVIDER_NAMES",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L122",
+      "source_location": "L259",
       "_origin": "ast",
       "id": "adapters_all_provider_names",
       "community": 1,
@@ -107,7 +197,7 @@
       "label": "isCommandAvailable()",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L124",
+      "source_location": "L261",
       "_origin": "ast",
       "id": "adapters_iscommandavailable",
       "community": 1,
@@ -117,7 +207,7 @@
       "label": "PROVIDER_NAMES",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L132",
+      "source_location": "L269",
       "_origin": "ast",
       "id": "adapters_provider_names",
       "community": 2,
@@ -127,7 +217,7 @@
       "label": "DISABLED_PROVIDERS",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L138",
+      "source_location": "L275",
       "_origin": "ast",
       "id": "adapters_disabled_providers",
       "community": 1,
@@ -137,20 +227,20 @@
       "label": "DEFAULT_CHAIN",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L142",
+      "source_location": "L279",
       "_origin": "ast",
       "id": "adapters_default_chain",
-      "community": 2,
+      "community": 0,
       "norm_label": "default_chain"
     },
     {
       "label": "buildArgv()",
       "file_type": "code",
       "source_file": "adapters.js",
-      "source_location": "L150",
+      "source_location": "L290",
       "_origin": "ast",
       "id": "adapters_buildargv",
-      "community": 0,
+      "community": 1,
       "norm_label": "buildargv()"
     },
     {
@@ -247,11 +337,31 @@
       "label": "walkChain()",
       "file_type": "code",
       "source_file": "chain.js",
-      "source_location": "L32",
+      "source_location": "L38",
       "_origin": "ast",
       "id": "chain_walkchain",
       "community": 0,
       "norm_label": "walkchain()"
+    },
+    {
+      "label": "invalidResponse()",
+      "file_type": "code",
+      "source_file": "chain.js",
+      "source_location": "L89",
+      "_origin": "ast",
+      "id": "chain_invalidresponse",
+      "community": 0,
+      "norm_label": "invalidresponse()"
+    },
+    {
+      "label": "raceChain()",
+      "file_type": "code",
+      "source_file": "chain.js",
+      "source_location": "L105",
+      "_origin": "ast",
+      "id": "chain_racechain",
+      "community": 9,
+      "norm_label": "racechain()"
     },
     {
       "label": "install.sh",
@@ -362,10 +472,20 @@
       "norm_label": "dev"
     },
     {
+      "label": "test",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "package_scripts_test",
+      "community": 3,
+      "norm_label": "test"
+    },
+    {
       "label": "dependencies",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L10",
+      "source_location": "L11",
       "_origin": "ast",
       "id": "package_dependencies",
       "community": 3,
@@ -375,11 +495,21 @@
       "label": "express",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L11",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "package_dependencies_express",
       "community": 3,
       "norm_label": "express"
+    },
+    {
+      "label": "multer",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "package_dependencies_multer",
+      "community": 3,
+      "norm_label": "multer"
     },
     {
       "label": "runner.js",
@@ -388,7 +518,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "runner",
-      "community": 6,
+      "community": 0,
       "norm_label": "runner.js"
     },
     {
@@ -398,7 +528,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "runner_spawn",
-      "community": 6,
+      "community": 0,
       "norm_label": "{ spawn }"
     },
     {
@@ -408,7 +538,7 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "runner_os",
-      "community": 6,
+      "community": 0,
       "norm_label": "os"
     },
     {
@@ -418,17 +548,17 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "runner_buildchildenv",
-      "community": 6,
+      "community": 0,
       "norm_label": "{ buildchildenv }"
     },
     {
       "label": "spawnAgent()",
       "file_type": "code",
       "source_file": "runner.js",
-      "source_location": "L13",
+      "source_location": "L15",
       "_origin": "ast",
       "id": "runner_spawnagent",
-      "community": 6,
+      "community": 0,
       "norm_label": "spawnagent()"
     },
     {
@@ -462,30 +592,40 @@
       "norm_label": "{ randomuuid }"
     },
     {
-      "label": "{ walkChain }",
+      "label": "{ walkChain, raceChain }",
       "file_type": "code",
       "source_file": "server.js",
       "source_location": "L3",
       "_origin": "ast",
-      "id": "server_walkchain",
+      "id": "server_walkchain_racechain",
       "community": 2,
-      "norm_label": "{ walkchain }"
+      "norm_label": "{ walkchain, racechain }"
     },
     {
-      "label": "{ ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS }",
+      "label": "{ ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh }",
       "file_type": "code",
       "source_file": "server.js",
       "source_location": "L4",
       "_origin": "ast",
-      "id": "server_adapters_default_chain_provider_names_disabled_providers",
+      "id": "server_adapters_default_chain_provider_names_disabled_providers_schedulemodelrefresh",
       "community": 2,
-      "norm_label": "{ adapters, default_chain, provider_names, disabled_providers }"
+      "norm_label": "{ adapters, default_chain, provider_names, disabled_providers, schedulemodelrefresh }"
+    },
+    {
+      "label": "{ upload, buildPromptWithFiles, cleanupFiles, MAX_FILES, MAX_FILE_BYTES }",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "server_upload_buildpromptwithfiles_cleanupfiles_max_files_max_file_bytes",
+      "community": 2,
+      "norm_label": "{ upload, buildpromptwithfiles, cleanupfiles, max_files, max_file_bytes }"
     },
     {
       "label": "app",
       "file_type": "code",
       "source_file": "server.js",
-      "source_location": "L6",
+      "source_location": "L7",
       "_origin": "ast",
       "id": "server_app",
       "community": 2,
@@ -495,7 +635,7 @@
       "label": "runs",
       "file_type": "code",
       "source_file": "server.js",
-      "source_location": "L29",
+      "source_location": "L30",
       "_origin": "ast",
       "id": "server_runs",
       "community": 2,
@@ -505,11 +645,281 @@
       "label": "scheduleEvict()",
       "file_type": "code",
       "source_file": "server.js",
-      "source_location": "L33",
+      "source_location": "L34",
       "_origin": "ast",
       "id": "server_scheduleevict",
       "community": 2,
       "norm_label": "scheduleevict()"
+    },
+    {
+      "label": "emit()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L38",
+      "_origin": "ast",
+      "id": "server_emit",
+      "community": 2,
+      "norm_label": "emit()"
+    },
+    {
+      "label": "closeSubscribers()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "server_closesubscribers",
+      "community": 2,
+      "norm_label": "closesubscribers()"
+    },
+    {
+      "label": "steeringPrompt()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L50",
+      "_origin": "ast",
+      "id": "server_steeringprompt",
+      "community": 2,
+      "norm_label": "steeringprompt()"
+    },
+    {
+      "label": "executeRun()",
+      "file_type": "code",
+      "source_file": "server.js",
+      "source_location": "L55",
+      "_origin": "ast",
+      "id": "server_executerun",
+      "community": 2,
+      "norm_label": "executerun()"
+    },
+    {
+      "label": "adapters.test.js",
+      "file_type": "code",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_adapters_test",
+      "community": 1,
+      "norm_label": "adapters.test.js"
+    },
+    {
+      "label": "test",
+      "file_type": "code",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_adapters_test_test",
+      "community": 1,
+      "norm_label": "test"
+    },
+    {
+      "label": "assert",
+      "file_type": "code",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "test_adapters_test_assert",
+      "community": 1,
+      "norm_label": "assert"
+    },
+    {
+      "label": "{ buildArgv }",
+      "file_type": "code",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "test_adapters_test_buildargv",
+      "community": 1,
+      "norm_label": "{ buildargv }"
+    },
+    {
+      "label": "chain.test.js",
+      "file_type": "code",
+      "source_file": "test/chain.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_chain_test",
+      "community": 9,
+      "norm_label": "chain.test.js"
+    },
+    {
+      "label": "test",
+      "file_type": "code",
+      "source_file": "test/chain.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_chain_test_test",
+      "community": 9,
+      "norm_label": "test"
+    },
+    {
+      "label": "assert",
+      "file_type": "code",
+      "source_file": "test/chain.test.js",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "test_chain_test_assert",
+      "community": 9,
+      "norm_label": "assert"
+    },
+    {
+      "label": "{ raceChain }",
+      "file_type": "code",
+      "source_file": "test/chain.test.js",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "test_chain_test_racechain",
+      "community": 9,
+      "norm_label": "{ racechain }"
+    },
+    {
+      "label": "uploads.test.js",
+      "file_type": "code",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_uploads_test",
+      "community": 5,
+      "norm_label": "uploads.test.js"
+    },
+    {
+      "label": "test",
+      "file_type": "code",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_uploads_test_test",
+      "community": 5,
+      "norm_label": "test"
+    },
+    {
+      "label": "assert",
+      "file_type": "code",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "test_uploads_test_assert",
+      "community": 5,
+      "norm_label": "assert"
+    },
+    {
+      "label": "path",
+      "file_type": "code",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "test_uploads_test_path",
+      "community": 5,
+      "norm_label": "path"
+    },
+    {
+      "label": "{ buildPromptWithFiles, safeFilename }",
+      "file_type": "code",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "test_uploads_test_buildpromptwithfiles_safefilename",
+      "community": 5,
+      "norm_label": "{ buildpromptwithfiles, safefilename }"
+    },
+    {
+      "label": "uploads.js",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "uploads",
+      "community": 5,
+      "norm_label": "uploads.js"
+    },
+    {
+      "label": "fs",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "uploads_fs",
+      "community": 5,
+      "norm_label": "fs"
+    },
+    {
+      "label": "os",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "uploads_os",
+      "community": 5,
+      "norm_label": "os"
+    },
+    {
+      "label": "path",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "uploads_path",
+      "community": 5,
+      "norm_label": "path"
+    },
+    {
+      "label": "multer",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "uploads_multer",
+      "community": 5,
+      "norm_label": "multer"
+    },
+    {
+      "label": "uploadRoot",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "uploads_uploadroot",
+      "community": 5,
+      "norm_label": "uploadroot"
+    },
+    {
+      "label": "safeFilename()",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "uploads_safefilename",
+      "community": 5,
+      "norm_label": "safefilename()"
+    },
+    {
+      "label": "upload",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "uploads_upload",
+      "community": 5,
+      "norm_label": "upload"
+    },
+    {
+      "label": "buildPromptWithFiles()",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "uploads_buildpromptwithfiles",
+      "community": 5,
+      "norm_label": "buildpromptwithfiles()"
+    },
+    {
+      "label": "cleanupFiles()",
+      "file_type": "code",
+      "source_file": "uploads.js",
+      "source_location": "L32",
+      "_origin": "ast",
+      "id": "uploads_cleanupfiles",
+      "community": 5,
+      "norm_label": "cleanupfiles()"
     },
     {
       "label": "README.md",
@@ -545,7 +955,7 @@
       "label": "Supported Providers",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L16",
+      "source_location": "L19",
       "_origin": "ast",
       "id": "readme_supported_providers",
       "community": 4,
@@ -555,7 +965,7 @@
       "label": "Prerequisites",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L28",
+      "source_location": "L32",
       "_origin": "ast",
       "id": "readme_prerequisites",
       "community": 4,
@@ -565,7 +975,7 @@
       "label": "Installation",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L34",
+      "source_location": "L38",
       "_origin": "ast",
       "id": "readme_installation",
       "community": 4,
@@ -575,77 +985,87 @@
       "label": "API Documentation",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L50",
+      "source_location": "L54",
       "_origin": "ast",
       "id": "readme_api_documentation",
-      "community": 5,
+      "community": 4,
       "norm_label": "api documentation"
     },
     {
       "label": "`POST /runs`",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L52",
+      "source_location": "L56",
       "_origin": "ast",
       "id": "readme_post_runs",
-      "community": 5,
+      "community": 4,
       "norm_label": "`post /runs`"
     },
     {
       "label": "`GET /runs/:id/stream`",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L78",
+      "source_location": "L96",
       "_origin": "ast",
       "id": "readme_get_runs_id_stream",
-      "community": 5,
+      "community": 4,
       "norm_label": "`get /runs/:id/stream`"
     },
     {
       "label": "`GET /runs/:id`",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L87",
+      "source_location": "L105",
       "_origin": "ast",
       "id": "readme_get_runs_id",
-      "community": 5,
+      "community": 4,
       "norm_label": "`get /runs/:id`"
     },
     {
       "label": "`DELETE /runs/:id`",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L90",
+      "source_location": "L108",
       "_origin": "ast",
       "id": "readme_delete_runs_id",
-      "community": 5,
+      "community": 4,
       "norm_label": "`delete /runs/:id`"
+    },
+    {
+      "label": "`POST /runs/:id/feedback`",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L111",
+      "_origin": "ast",
+      "id": "readme_post_runs_id_feedback",
+      "community": 4,
+      "norm_label": "`post /runs/:id/feedback`"
     },
     {
       "label": "`GET /models`",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L93",
+      "source_location": "L122",
       "_origin": "ast",
       "id": "readme_get_models",
-      "community": 5,
+      "community": 4,
       "norm_label": "`get /models`"
     },
     {
       "label": "`GET /health`",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L96",
+      "source_location": "L125",
       "_origin": "ast",
       "id": "readme_get_health",
-      "community": 5,
+      "community": 4,
       "norm_label": "`get /health`"
     },
     {
       "label": "Configuration",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L99",
+      "source_location": "L128",
       "_origin": "ast",
       "id": "readme_configuration",
       "community": 4,
@@ -655,7 +1075,7 @@
       "label": "Service Management",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L105",
+      "source_location": "L141",
       "_origin": "ast",
       "id": "readme_service_management",
       "community": 4,
@@ -665,11 +1085,311 @@
       "label": "License",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L114",
+      "source_location": "L150",
       "_origin": "ast",
       "id": "readme_license",
       "community": 4,
       "norm_label": "license"
+    },
+    {
+      "label": "2026-07-19-gateway-speed-uploads.md",
+      "file_type": "document",
+      "source_file": "docs/superpowers/plans/2026-07-19-gateway-speed-uploads.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "plans_2026_07_19_gateway_speed_uploads",
+      "community": 14,
+      "norm_label": "2026-07-19-gateway-speed-uploads.md"
+    },
+    {
+      "label": "Gateway speed, uploads, and steering plan",
+      "file_type": "document",
+      "source_file": "docs/superpowers/plans/2026-07-19-gateway-speed-uploads.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "plans_2026_07_19_gateway_speed_uploads_gateway_speed_uploads_and_steering_plan",
+      "community": 14,
+      "norm_label": "gateway speed, uploads, and steering plan"
+    },
+    {
+      "label": "2026-07-19-gateway-speed-uploads-design.md",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-07-19-gateway-speed-uploads-design.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_2026_07_19_gateway_speed_uploads_design",
+      "community": 12,
+      "norm_label": "2026-07-19-gateway-speed-uploads-design.md"
+    },
+    {
+      "label": "Gateway speed, uploads, and steering design",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-07-19-gateway-speed-uploads-design.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "specs_2026_07_19_gateway_speed_uploads_design_gateway_speed_uploads_and_steering_design",
+      "community": 12,
+      "norm_label": "gateway speed, uploads, and steering design"
+    },
+    {
+      "label": "Decision",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-07-19-gateway-speed-uploads-design.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "specs_2026_07_19_gateway_speed_uploads_design_decision",
+      "community": 12,
+      "norm_label": "decision"
+    },
+    {
+      "label": "Guardrails",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-07-19-gateway-speed-uploads-design.md",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "specs_2026_07_19_gateway_speed_uploads_design_guardrails",
+      "community": 12,
+      "norm_label": "guardrails"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "memory-bank/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_readme",
+      "community": 11,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "Savant Gateway Memory Bank",
+      "file_type": "document",
+      "source_file": "memory-bank/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_readme_savant_gateway_memory_bank",
+      "community": 11,
+      "norm_label": "savant gateway memory bank"
+    },
+    {
+      "label": "Read order",
+      "file_type": "document",
+      "source_file": "memory-bank/README.md",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "memory_bank_readme_read_order",
+      "community": 11,
+      "norm_label": "read order"
+    },
+    {
+      "label": "Current state",
+      "file_type": "document",
+      "source_file": "memory-bank/README.md",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "memory_bank_readme_current_state",
+      "community": 11,
+      "norm_label": "current state"
+    },
+    {
+      "label": "agent-playbook.md",
+      "file_type": "document",
+      "source_file": "memory-bank/agent-playbook.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_agent_playbook",
+      "community": 13,
+      "norm_label": "agent-playbook.md"
+    },
+    {
+      "label": "Gateway Agent Playbook",
+      "file_type": "document",
+      "source_file": "memory-bank/agent-playbook.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_agent_playbook_gateway_agent_playbook",
+      "community": 13,
+      "norm_label": "gateway agent playbook"
+    },
+    {
+      "label": "Safe edit order",
+      "file_type": "document",
+      "source_file": "memory-bank/agent-playbook.md",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "memory_bank_agent_playbook_safe_edit_order",
+      "community": 13,
+      "norm_label": "safe edit order"
+    },
+    {
+      "label": "architecture.md",
+      "file_type": "document",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_architecture",
+      "community": 6,
+      "norm_label": "architecture.md"
+    },
+    {
+      "label": "Gateway Architecture",
+      "file_type": "document",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_architecture_gateway_architecture",
+      "community": 6,
+      "norm_label": "gateway architecture"
+    },
+    {
+      "label": "Purpose",
+      "file_type": "document",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "memory_bank_architecture_purpose",
+      "community": 6,
+      "norm_label": "purpose"
+    },
+    {
+      "label": "Main flow",
+      "file_type": "document",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "memory_bank_architecture_main_flow",
+      "community": 6,
+      "norm_label": "main flow"
+    },
+    {
+      "label": "Contract points",
+      "file_type": "document",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "memory_bank_architecture_contract_points",
+      "community": 6,
+      "norm_label": "contract points"
+    },
+    {
+      "label": "Important behavior",
+      "file_type": "document",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "memory_bank_architecture_important_behavior",
+      "community": 6,
+      "norm_label": "important behavior"
+    },
+    {
+      "label": "runtime.md",
+      "file_type": "document",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_runtime",
+      "community": 8,
+      "norm_label": "runtime.md"
+    },
+    {
+      "label": "Gateway Runtime",
+      "file_type": "document",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_runtime_gateway_runtime",
+      "community": 8,
+      "norm_label": "gateway runtime"
+    },
+    {
+      "label": "Startup",
+      "file_type": "document",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "memory_bank_runtime_startup",
+      "community": 8,
+      "norm_label": "startup"
+    },
+    {
+      "label": "Local dependencies",
+      "file_type": "document",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "memory_bank_runtime_local_dependencies",
+      "community": 8,
+      "norm_label": "local dependencies"
+    },
+    {
+      "label": "Operational notes",
+      "file_type": "document",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "memory_bank_runtime_operational_notes",
+      "community": 8,
+      "norm_label": "operational notes"
+    },
+    {
+      "label": "Logging and storage",
+      "file_type": "document",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "memory_bank_runtime_logging_and_storage",
+      "community": 8,
+      "norm_label": "logging and storage"
+    },
+    {
+      "label": "testing-and-quality.md",
+      "file_type": "document",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_testing_and_quality",
+      "community": 10,
+      "norm_label": "testing-and-quality.md"
+    },
+    {
+      "label": "Gateway Testing and Quality",
+      "file_type": "document",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "memory_bank_testing_and_quality_gateway_testing_and_quality",
+      "community": 10,
+      "norm_label": "gateway testing and quality"
+    },
+    {
+      "label": "Verification commands",
+      "file_type": "document",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "memory_bank_testing_and_quality_verification_commands",
+      "community": 10,
+      "norm_label": "verification commands"
+    },
+    {
+      "label": "What to verify",
+      "file_type": "document",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "memory_bank_testing_and_quality_what_to_verify",
+      "community": 10,
+      "norm_label": "what to verify"
+    },
+    {
+      "label": "Common regressions",
+      "file_type": "document",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "memory_bank_testing_and_quality_common_regressions",
+      "community": 10,
+      "norm_label": "common regressions"
     }
   ],
   "links": [
@@ -679,9 +1399,9 @@
       "source_file": "adapters.js",
       "source_location": "L46",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_adapters",
-      "confidence_score": 1.0
+      "target": "adapters_adapters"
     },
     {
       "relation": "contains",
@@ -689,9 +1409,9 @@
       "source_file": "adapters.js",
       "source_location": "L122",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_all_provider_names",
-      "confidence_score": 1.0
+      "target": "adapters_all_provider_names"
     },
     {
       "relation": "contains",
@@ -699,9 +1419,9 @@
       "source_file": "adapters.js",
       "source_location": "L150",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_buildargv",
-      "confidence_score": 1.0
+      "target": "adapters_buildargv"
     },
     {
       "relation": "contains",
@@ -709,9 +1429,9 @@
       "source_file": "adapters.js",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_buildchildenv",
-      "confidence_score": 1.0
+      "target": "adapters_buildchildenv"
     },
     {
       "relation": "contains",
@@ -719,9 +1439,9 @@
       "source_file": "adapters.js",
       "source_location": "L142",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_default_chain",
-      "confidence_score": 1.0
+      "target": "adapters_default_chain"
     },
     {
       "relation": "contains",
@@ -729,8 +1449,38 @@
       "source_file": "adapters.js",
       "source_location": "L138",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_disabled_providers",
+      "target": "adapters_disabled_providers"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_discoveragymodels",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_discovercodexmodels",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L63",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_discoverhermesmodels",
       "confidence_score": 1.0
     },
     {
@@ -739,8 +1489,18 @@
       "source_file": "adapters.js",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_extra_path_dirs",
+      "target": "adapters_extra_path_dirs"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_fs",
       "confidence_score": 1.0
     },
     {
@@ -749,9 +1509,9 @@
       "source_file": "adapters.js",
       "source_location": "L124",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_iscommandavailable",
-      "confidence_score": 1.0
+      "target": "adapters_iscommandavailable"
     },
     {
       "relation": "contains",
@@ -759,8 +1519,18 @@
       "source_file": "adapters.js",
       "source_location": "L44",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_isquotaerror",
+      "target": "adapters_isquotaerror"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L243",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_lastmodelrefresh",
       "confidence_score": 1.0
     },
     {
@@ -769,9 +1539,9 @@
       "source_file": "adapters.js",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_os",
-      "confidence_score": 1.0
+      "target": "adapters_os"
     },
     {
       "relation": "contains",
@@ -779,9 +1549,9 @@
       "source_file": "adapters.js",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_path",
-      "confidence_score": 1.0
+      "target": "adapters_path"
     },
     {
       "relation": "contains",
@@ -789,9 +1559,9 @@
       "source_file": "adapters.js",
       "source_location": "L132",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_provider_names",
-      "confidence_score": 1.0
+      "target": "adapters_provider_names"
     },
     {
       "relation": "contains",
@@ -799,8 +1569,48 @@
       "source_file": "adapters.js",
       "source_location": "L32",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_quota_patterns",
+      "target": "adapters_quota_patterns"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L220",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_refreshhermesmodels",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L227",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_refreshlocalmodels",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_resolvemodel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L245",
+      "weight": 1.0,
+      "source": "adapters",
+      "target": "adapters_schedulemodelrefresh",
       "confidence_score": 1.0
     },
     {
@@ -809,9 +1619,9 @@
       "source_file": "adapters.js",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters",
-      "target": "adapters_spawnsync",
-      "confidence_score": 1.0
+      "target": "adapters_spawnsync"
     },
     {
       "relation": "imports_from",
@@ -820,9 +1630,9 @@
       "source_file": "chain.js",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "adapters",
-      "confidence_score": 1.0
+      "target": "adapters"
     },
     {
       "relation": "imports_from",
@@ -831,9 +1641,9 @@
       "source_file": "runner.js",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "runner",
-      "target": "adapters",
-      "confidence_score": 1.0
+      "target": "adapters"
     },
     {
       "relation": "imports_from",
@@ -842,8 +1652,30 @@
       "source_file": "server.js",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "server",
+      "target": "adapters"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "test_adapters_test",
       "target": "adapters",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "adapters.js",
+      "source_location": "L104",
+      "weight": 1.0,
+      "source": "adapters_discoveragymodels",
+      "target": "adapters_buildchildenv",
       "confidence_score": 1.0
     },
     {
@@ -853,9 +1685,9 @@
       "source_file": "adapters.js",
       "source_location": "L126",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "adapters_iscommandavailable",
-      "target": "adapters_buildchildenv",
-      "confidence_score": 1.0
+      "target": "adapters_buildchildenv"
     },
     {
       "relation": "imports",
@@ -864,9 +1696,9 @@
       "source_file": "runner.js",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "runner",
-      "target": "adapters_buildchildenv",
-      "confidence_score": 1.0
+      "target": "adapters_buildchildenv"
     },
     {
       "relation": "imports",
@@ -875,9 +1707,9 @@
       "source_file": "chain.js",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "adapters_isquotaerror",
-      "confidence_score": 1.0
+      "target": "adapters_isquotaerror"
     },
     {
       "relation": "calls",
@@ -891,69 +1723,47 @@
       "target": "adapters_isquotaerror"
     },
     {
-      "relation": "imports",
-      "context": "import",
+      "relation": "calls",
+      "context": "call",
       "confidence": "EXTRACTED",
-      "source_file": "chain.js",
-      "source_location": "L4",
+      "source_file": "adapters.js",
+      "source_location": "L293",
       "weight": 1.0,
-      "source": "chain",
-      "target": "adapters_adapters",
+      "source": "adapters_buildargv",
+      "target": "adapters_resolvemodel",
       "confidence_score": 1.0
     },
     {
-      "relation": "imports",
-      "context": "import",
+      "relation": "calls",
+      "context": "call",
       "confidence": "EXTRACTED",
-      "source_file": "server.js",
-      "source_location": "L4",
+      "source_file": "adapters.js",
+      "source_location": "L221",
       "weight": 1.0,
-      "source": "server",
-      "target": "adapters_adapters",
+      "source": "adapters_refreshhermesmodels",
+      "target": "adapters_discoverhermesmodels",
       "confidence_score": 1.0
     },
     {
-      "relation": "imports",
-      "context": "import",
+      "relation": "calls",
+      "context": "call",
       "confidence": "EXTRACTED",
-      "source_file": "server.js",
-      "source_location": "L4",
+      "source_file": "adapters.js",
+      "source_location": "L228",
       "weight": 1.0,
-      "source": "server",
-      "target": "adapters_provider_names",
+      "source": "adapters_refreshlocalmodels",
+      "target": "adapters_discovercodexmodels",
       "confidence_score": 1.0
     },
     {
-      "relation": "imports",
-      "context": "import",
+      "relation": "calls",
+      "context": "call",
       "confidence": "EXTRACTED",
-      "source_file": "server.js",
-      "source_location": "L4",
+      "source_file": "adapters.js",
+      "source_location": "L232",
       "weight": 1.0,
-      "source": "server",
-      "target": "adapters_disabled_providers",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "chain.js",
-      "source_location": "L4",
-      "weight": 1.0,
-      "source": "chain",
-      "target": "adapters_default_chain",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "server.js",
-      "source_location": "L4",
-      "weight": 1.0,
-      "source": "server",
-      "target": "adapters_default_chain",
+      "source": "adapters_refreshlocalmodels",
+      "target": "adapters_discoveragymodels",
       "confidence_score": 1.0
     },
     {
@@ -963,9 +1773,86 @@
       "source_file": "chain.js",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "adapters_buildargv",
+      "target": "adapters_adapters"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "server",
+      "target": "adapters_adapters"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "server",
+      "target": "adapters_schedulemodelrefresh",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "server",
+      "target": "adapters_provider_names"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "server",
+      "target": "adapters_disabled_providers"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "chain.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "chain",
+      "target": "adapters_default_chain"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "server",
+      "target": "adapters_default_chain"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "chain.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "chain",
+      "target": "adapters_buildargv"
     },
     {
       "relation": "calls",
@@ -979,14 +1866,25 @@
       "target": "adapters_buildargv"
     },
     {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "test_adapters_test",
+      "target": "adapters_buildargv",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "chain.js",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_adapters_default_chain_isquotaerror_buildargv",
-      "confidence_score": 1.0
+      "target": "chain_adapters_default_chain_isquotaerror_buildargv"
     },
     {
       "relation": "contains",
@@ -994,8 +1892,18 @@
       "source_file": "chain.js",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_fs",
+      "target": "chain_fs"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chain.js",
+      "source_location": "L89",
+      "weight": 1.0,
+      "source": "chain",
+      "target": "chain_invalidresponse",
       "confidence_score": 1.0
     },
     {
@@ -1004,9 +1912,9 @@
       "source_file": "chain.js",
       "source_location": "L11",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_isolated_cwd_providers",
-      "confidence_score": 1.0
+      "target": "chain_isolated_cwd_providers"
     },
     {
       "relation": "contains",
@@ -1014,9 +1922,9 @@
       "source_file": "chain.js",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_os",
-      "confidence_score": 1.0
+      "target": "chain_os"
     },
     {
       "relation": "contains",
@@ -1024,9 +1932,9 @@
       "source_file": "chain.js",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_path",
-      "confidence_score": 1.0
+      "target": "chain_path"
     },
     {
       "relation": "contains",
@@ -1034,8 +1942,18 @@
       "source_file": "chain.js",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_quorum_staging_dir",
+      "target": "chain_quorum_staging_dir"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chain.js",
+      "source_location": "L105",
+      "weight": 1.0,
+      "source": "chain",
+      "target": "chain_racechain",
       "confidence_score": 1.0
     },
     {
@@ -1044,9 +1962,9 @@
       "source_file": "chain.js",
       "source_location": "L16",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_resolveprovidercwd",
-      "confidence_score": 1.0
+      "target": "chain_resolveprovidercwd"
     },
     {
       "relation": "contains",
@@ -1054,9 +1972,9 @@
       "source_file": "chain.js",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_spawnagent",
-      "confidence_score": 1.0
+      "target": "chain_spawnagent"
     },
     {
       "relation": "contains",
@@ -1064,9 +1982,9 @@
       "source_file": "chain.js",
       "source_location": "L32",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "chain_walkchain",
-      "confidence_score": 1.0
+      "target": "chain_walkchain"
     },
     {
       "relation": "imports_from",
@@ -1075,9 +1993,9 @@
       "source_file": "chain.js",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "runner",
-      "confidence_score": 1.0
+      "target": "runner"
     },
     {
       "relation": "imports",
@@ -1086,9 +2004,9 @@
       "source_file": "chain.js",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain",
-      "target": "runner_spawnagent",
-      "confidence_score": 1.0
+      "target": "runner_spawnagent"
     },
     {
       "relation": "imports_from",
@@ -1097,7 +2015,18 @@
       "source_file": "server.js",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "server",
+      "target": "chain"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/chain.test.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "test_chain_test",
       "target": "chain",
       "confidence_score": 1.0
     },
@@ -1108,8 +2037,19 @@
       "source_file": "chain.js",
       "source_location": "L57",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "chain_walkchain",
-      "target": "chain_resolveprovidercwd",
+      "target": "chain_resolveprovidercwd"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "chain.js",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "chain_walkchain",
+      "target": "chain_invalidresponse",
       "confidence_score": 1.0
     },
     {
@@ -1130,8 +2070,30 @@
       "source_file": "server.js",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "server",
-      "target": "chain_walkchain",
+      "target": "chain_walkchain"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "server",
+      "target": "chain_racechain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/chain.test.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "test_chain_test",
+      "target": "chain_racechain",
       "confidence_score": 1.0
     },
     {
@@ -1140,9 +2102,9 @@
       "source_file": "install.sh",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "install",
-      "target": "users_home_code_project_x_savant_gateway_install_sh__entry",
-      "confidence_score": 1.0
+      "target": "users_home_code_project_x_savant_gateway_install_sh__entry"
     },
     {
       "relation": "contains",
@@ -1150,9 +2112,9 @@
       "source_file": "package.json",
       "source_location": "L10",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package",
-      "target": "package_dependencies",
-      "confidence_score": 1.0
+      "target": "package_dependencies"
     },
     {
       "relation": "contains",
@@ -1160,9 +2122,9 @@
       "source_file": "package.json",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package",
-      "target": "package_description",
-      "confidence_score": 1.0
+      "target": "package_description"
     },
     {
       "relation": "contains",
@@ -1170,9 +2132,9 @@
       "source_file": "package.json",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package",
-      "target": "package_main",
-      "confidence_score": 1.0
+      "target": "package_main"
     },
     {
       "relation": "contains",
@@ -1180,9 +2142,9 @@
       "source_file": "package.json",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package",
-      "target": "package_name",
-      "confidence_score": 1.0
+      "target": "package_name"
     },
     {
       "relation": "contains",
@@ -1190,9 +2152,9 @@
       "source_file": "package.json",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package",
-      "target": "package_scripts",
-      "confidence_score": 1.0
+      "target": "package_scripts"
     },
     {
       "relation": "contains",
@@ -1200,9 +2162,9 @@
       "source_file": "package.json",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package",
-      "target": "package_version",
-      "confidence_score": 1.0
+      "target": "package_version"
     },
     {
       "relation": "contains",
@@ -1210,9 +2172,9 @@
       "source_file": "package.json",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package_scripts",
-      "target": "package_scripts_dev",
-      "confidence_score": 1.0
+      "target": "package_scripts_dev"
     },
     {
       "relation": "contains",
@@ -1220,8 +2182,18 @@
       "source_file": "package.json",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package_scripts",
-      "target": "package_scripts_start",
+      "target": "package_scripts_start"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "package_scripts",
+      "target": "package_scripts_test",
       "confidence_score": 1.0
     },
     {
@@ -1230,8 +2202,18 @@
       "source_file": "package.json",
       "source_location": "L11",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package_dependencies",
-      "target": "package_dependencies_express",
+      "target": "package_dependencies_express"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "package_dependencies",
+      "target": "package_dependencies_multer",
       "confidence_score": 1.0
     },
     {
@@ -1240,9 +2222,9 @@
       "source_file": "runner.js",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "runner",
-      "target": "runner_buildchildenv",
-      "confidence_score": 1.0
+      "target": "runner_buildchildenv"
     },
     {
       "relation": "contains",
@@ -1250,9 +2232,9 @@
       "source_file": "runner.js",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "runner",
-      "target": "runner_os",
-      "confidence_score": 1.0
+      "target": "runner_os"
     },
     {
       "relation": "contains",
@@ -1260,9 +2242,9 @@
       "source_file": "runner.js",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "runner",
-      "target": "runner_spawn",
-      "confidence_score": 1.0
+      "target": "runner_spawn"
     },
     {
       "relation": "contains",
@@ -1270,9 +2252,9 @@
       "source_file": "runner.js",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "runner",
-      "target": "runner_spawnagent",
-      "confidence_score": 1.0
+      "target": "runner_spawnagent"
     },
     {
       "relation": "contains",
@@ -1281,7 +2263,7 @@
       "source_location": "L4",
       "weight": 1.0,
       "source": "server",
-      "target": "server_adapters_default_chain_provider_names_disabled_providers",
+      "target": "server_adapters_default_chain_provider_names_disabled_providers_schedulemodelrefresh",
       "confidence_score": 1.0
     },
     {
@@ -1290,8 +2272,38 @@
       "source_file": "server.js",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "server",
-      "target": "server_app",
+      "target": "server_app"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_closesubscribers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_emit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L55",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_executerun",
       "confidence_score": 1.0
     },
     {
@@ -1300,9 +2312,9 @@
       "source_file": "server.js",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "server",
-      "target": "server_express",
-      "confidence_score": 1.0
+      "target": "server_express"
     },
     {
       "relation": "contains",
@@ -1310,9 +2322,9 @@
       "source_file": "server.js",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "server",
-      "target": "server_randomuuid",
-      "confidence_score": 1.0
+      "target": "server_randomuuid"
     },
     {
       "relation": "contains",
@@ -1320,9 +2332,9 @@
       "source_file": "server.js",
       "source_location": "L29",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "server",
-      "target": "server_runs",
-      "confidence_score": 1.0
+      "target": "server_runs"
     },
     {
       "relation": "contains",
@@ -1330,8 +2342,28 @@
       "source_file": "server.js",
       "source_location": "L33",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "server",
-      "target": "server_scheduleevict",
+      "target": "server_scheduleevict"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L50",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_steeringprompt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "server",
+      "target": "server_upload_buildpromptwithfiles_cleanupfiles_max_files_max_file_bytes",
       "confidence_score": 1.0
     },
     {
@@ -1341,7 +2373,285 @@
       "source_location": "L3",
       "weight": 1.0,
       "source": "server",
-      "target": "server_walkchain",
+      "target": "server_walkchain_racechain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "server",
+      "target": "uploads",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "server",
+      "target": "uploads_buildpromptwithfiles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "server",
+      "target": "uploads_cleanupfiles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "server",
+      "target": "uploads_upload",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server.js",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "server_executerun",
+      "target": "server_steeringprompt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "test_adapters_test",
+      "target": "test_adapters_test_assert",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "test_adapters_test",
+      "target": "test_adapters_test_buildargv",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/adapters.test.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "test_adapters_test",
+      "target": "test_adapters_test_test",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/chain.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "test_chain_test",
+      "target": "test_chain_test_assert",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/chain.test.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "test_chain_test",
+      "target": "test_chain_test_racechain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/chain.test.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "test_chain_test",
+      "target": "test_chain_test_test",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "test_uploads_test",
+      "target": "test_uploads_test_assert",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "test_uploads_test",
+      "target": "test_uploads_test_buildpromptwithfiles_safefilename",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "test_uploads_test",
+      "target": "test_uploads_test_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "test_uploads_test",
+      "target": "test_uploads_test_test",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "test_uploads_test",
+      "target": "uploads",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "test_uploads_test",
+      "target": "uploads_buildpromptwithfiles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/uploads.test.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "test_uploads_test",
+      "target": "uploads_safefilename",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_buildpromptwithfiles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_cleanupfiles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_fs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_multer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_os",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_safefilename",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_upload",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "uploads.js",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "uploads",
+      "target": "uploads_uploadroot",
       "confidence_score": 1.0
     },
     {
@@ -1350,9 +2660,9 @@
       "source_file": "README.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme",
-      "target": "readme_savant_gateway",
-      "confidence_score": 1.0
+      "target": "readme_savant_gateway"
     },
     {
       "relation": "contains",
@@ -1360,9 +2670,9 @@
       "source_file": "README.md",
       "source_location": "L50",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_savant_gateway",
-      "target": "readme_api_documentation",
-      "confidence_score": 1.0
+      "target": "readme_api_documentation"
     },
     {
       "relation": "contains",
@@ -1370,9 +2680,9 @@
       "source_file": "README.md",
       "source_location": "L99",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_savant_gateway",
-      "target": "readme_configuration",
-      "confidence_score": 1.0
+      "target": "readme_configuration"
     },
     {
       "relation": "contains",
@@ -1380,9 +2690,9 @@
       "source_file": "README.md",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_savant_gateway",
-      "target": "readme_features",
-      "confidence_score": 1.0
+      "target": "readme_features"
     },
     {
       "relation": "contains",
@@ -1390,9 +2700,9 @@
       "source_file": "README.md",
       "source_location": "L34",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_savant_gateway",
-      "target": "readme_installation",
-      "confidence_score": 1.0
+      "target": "readme_installation"
     },
     {
       "relation": "contains",
@@ -1400,9 +2710,9 @@
       "source_file": "README.md",
       "source_location": "L114",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_savant_gateway",
-      "target": "readme_license",
-      "confidence_score": 1.0
+      "target": "readme_license"
     },
     {
       "relation": "contains",
@@ -1410,9 +2720,9 @@
       "source_file": "README.md",
       "source_location": "L28",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_savant_gateway",
-      "target": "readme_prerequisites",
-      "confidence_score": 1.0
+      "target": "readme_prerequisites"
     },
     {
       "relation": "contains",
@@ -1420,9 +2730,9 @@
       "source_file": "README.md",
       "source_location": "L105",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_savant_gateway",
-      "target": "readme_service_management",
-      "confidence_score": 1.0
+      "target": "readme_service_management"
     },
     {
       "relation": "contains",
@@ -1430,9 +2740,9 @@
       "source_file": "README.md",
       "source_location": "L16",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_savant_gateway",
-      "target": "readme_supported_providers",
-      "confidence_score": 1.0
+      "target": "readme_supported_providers"
     },
     {
       "relation": "contains",
@@ -1440,9 +2750,9 @@
       "source_file": "README.md",
       "source_location": "L90",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_api_documentation",
-      "target": "readme_delete_runs_id",
-      "confidence_score": 1.0
+      "target": "readme_delete_runs_id"
     },
     {
       "relation": "contains",
@@ -1450,9 +2760,9 @@
       "source_file": "README.md",
       "source_location": "L96",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_api_documentation",
-      "target": "readme_get_health",
-      "confidence_score": 1.0
+      "target": "readme_get_health"
     },
     {
       "relation": "contains",
@@ -1460,9 +2770,9 @@
       "source_file": "README.md",
       "source_location": "L93",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_api_documentation",
-      "target": "readme_get_models",
-      "confidence_score": 1.0
+      "target": "readme_get_models"
     },
     {
       "relation": "contains",
@@ -1470,9 +2780,9 @@
       "source_file": "README.md",
       "source_location": "L87",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_api_documentation",
-      "target": "readme_get_runs_id",
-      "confidence_score": 1.0
+      "target": "readme_get_runs_id"
     },
     {
       "relation": "contains",
@@ -1480,9 +2790,9 @@
       "source_file": "README.md",
       "source_location": "L78",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_api_documentation",
-      "target": "readme_get_runs_id_stream",
-      "confidence_score": 1.0
+      "target": "readme_get_runs_id_stream"
     },
     {
       "relation": "contains",
@@ -1490,11 +2800,251 @@
       "source_file": "README.md",
       "source_location": "L52",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_api_documentation",
-      "target": "readme_post_runs",
+      "target": "readme_post_runs"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L111",
+      "weight": 1.0,
+      "source": "readme_api_documentation",
+      "target": "readme_post_runs_id_feedback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/superpowers/plans/2026-07-19-gateway-speed-uploads.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "plans_2026_07_19_gateway_speed_uploads",
+      "target": "plans_2026_07_19_gateway_speed_uploads_gateway_speed_uploads_and_steering_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/superpowers/specs/2026-07-19-gateway-speed-uploads-design.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "specs_2026_07_19_gateway_speed_uploads_design",
+      "target": "specs_2026_07_19_gateway_speed_uploads_design_gateway_speed_uploads_and_steering_design",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/superpowers/specs/2026-07-19-gateway-speed-uploads-design.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "specs_2026_07_19_gateway_speed_uploads_design_gateway_speed_uploads_and_steering_design",
+      "target": "specs_2026_07_19_gateway_speed_uploads_design_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/superpowers/specs/2026-07-19-gateway-speed-uploads-design.md",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "specs_2026_07_19_gateway_speed_uploads_design_gateway_speed_uploads_and_steering_design",
+      "target": "specs_2026_07_19_gateway_speed_uploads_design_guardrails",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "memory_bank_readme",
+      "target": "memory_bank_readme_savant_gateway_memory_bank",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/README.md",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "memory_bank_readme_savant_gateway_memory_bank",
+      "target": "memory_bank_readme_current_state",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/README.md",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "memory_bank_readme_savant_gateway_memory_bank",
+      "target": "memory_bank_readme_read_order",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/agent-playbook.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "memory_bank_agent_playbook",
+      "target": "memory_bank_agent_playbook_gateway_agent_playbook",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/agent-playbook.md",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "memory_bank_agent_playbook_gateway_agent_playbook",
+      "target": "memory_bank_agent_playbook_safe_edit_order",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "memory_bank_architecture",
+      "target": "memory_bank_architecture_gateway_architecture",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "memory_bank_architecture_gateway_architecture",
+      "target": "memory_bank_architecture_contract_points",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "memory_bank_architecture_gateway_architecture",
+      "target": "memory_bank_architecture_important_behavior",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "memory_bank_architecture_gateway_architecture",
+      "target": "memory_bank_architecture_main_flow",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/architecture.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "memory_bank_architecture_gateway_architecture",
+      "target": "memory_bank_architecture_purpose",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "memory_bank_runtime",
+      "target": "memory_bank_runtime_gateway_runtime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "memory_bank_runtime_gateway_runtime",
+      "target": "memory_bank_runtime_local_dependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "memory_bank_runtime_gateway_runtime",
+      "target": "memory_bank_runtime_logging_and_storage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "memory_bank_runtime_gateway_runtime",
+      "target": "memory_bank_runtime_operational_notes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/runtime.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "memory_bank_runtime_gateway_runtime",
+      "target": "memory_bank_runtime_startup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "memory_bank_testing_and_quality",
+      "target": "memory_bank_testing_and_quality_gateway_testing_and_quality",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "memory_bank_testing_and_quality_gateway_testing_and_quality",
+      "target": "memory_bank_testing_and_quality_common_regressions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "memory_bank_testing_and_quality_gateway_testing_and_quality",
+      "target": "memory_bank_testing_and_quality_verification_commands",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "memory-bank/testing-and-quality.md",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "memory_bank_testing_and_quality_gateway_testing_and_quality",
+      "target": "memory_bank_testing_and_quality_what_to_verify",
       "confidence_score": 1.0
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "1c1ecd737dffd6f416de2647a2e99d1659531c0a"
+  "built_at_commit": "00d87083987c5103d29e5c88e09d92a4563dda67"
 }

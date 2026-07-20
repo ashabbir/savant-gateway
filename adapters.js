@@ -161,9 +161,9 @@ const ADAPTERS = {
   gemini: {
     name: 'gemini',
     label: 'Gemini',
-    baseArgv: ['gemini', '--yolo'],
-    modelArgv: (model) => model ? ['-m', model] : [],
-    promptArgv: (prompt) => [prompt],
+    baseArgv: ['gemini', '--dangerously-skip-permissions'],
+    modelArgv: (model) => model ? ['--model', model] : [],
+    promptArgv: (prompt) => ['--print', prompt],
     defaultModel: 'gemini-2.5-flash',
     availableModels: [
       'gemini-2.5-flash',
@@ -239,6 +239,23 @@ function refreshLocalModels() {
 refreshHermesModels()
 refreshLocalModels()
 
+const MODEL_REFRESH_TTL_MS = Number(process.env.GATEWAY_MODEL_REFRESH_TTL_MS) || 60_000
+let lastModelRefresh = Date.now()
+let modelRefreshPending = false
+function scheduleModelRefresh(force = false) {
+  if (modelRefreshPending || (!force && Date.now() - lastModelRefresh < MODEL_REFRESH_TTL_MS)) return
+  modelRefreshPending = true
+  setImmediate(() => {
+    try {
+      refreshHermesModels()
+      refreshLocalModels()
+      lastModelRefresh = Date.now()
+    } finally {
+      modelRefreshPending = false
+    }
+  })
+}
+
 const ALL_PROVIDER_NAMES = ['claude', 'copilot', 'codex', 'gemini', 'agy', 'hermes']
 
 function isCommandAvailable(command) {
@@ -294,5 +311,6 @@ module.exports = {
   discoverCodexModels,
   discoverAgyModels,
   refreshLocalModels,
+  scheduleModelRefresh,
   resolveModel,
 }
