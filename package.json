@@ -1,6 +1,6 @@
 {
   "name": "savant-gateway",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Host-native AI provider gateway for the Savant ecosystem",
   "main": "server.js",
   "scripts": {

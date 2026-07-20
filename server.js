@@ -1,5 +1,6 @@
 const express = require('express')
 const { randomUUID } = require('crypto') // built-in, no dep needed
+const { version } = require('./package.json')
 const { walkChain, raceChain } = require('./chain')
 const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh } = require('./adapters')
 const { upload, buildPromptWithFiles, cleanupFiles, MAX_FILES, MAX_FILE_BYTES } = require('./uploads')
@@ -293,6 +294,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     service: 'savant-gateway',
+    version,
     providers: PROVIDER_NAMES,
     providerDetails: PROVIDER_NAMES.map((providerName) => {
       const adapter = ADAPTERS[providerName]
