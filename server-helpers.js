@@ -31,6 +31,19 @@ function corsMiddleware(req, res, next) {
   next()
 }
 
+function parseChain(rawChain, defaultChain) {
+  if (rawChain === undefined) return defaultChain
+  let parsed = rawChain
+  if (typeof rawChain === 'string') {
+    parsed = JSON.parse(rawChain)
+  }
+  return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultChain
+}
+
+function filterActiveProviders(chain, activeProviderNames) {
+  return chain.filter((step) => activeProviderNames.includes(step.provider))
+}
+
 function createRun(params) {
   return {
     id: params.id,
@@ -119,9 +132,10 @@ module.exports = {
   DEFAULT_STAGGER_MS,
   MAX_CONCURRENCY,
   MAX_LIMIT,
-  MAX_LIMIT,
   DEFAULT_LIMIT,
   emit,
   executeRun,
-  corsMiddleware
+  corsMiddleware,
+  parseChain,
+  filterActiveProviders
 }

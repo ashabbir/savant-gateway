@@ -17,7 +17,9 @@ const {
   DEFAULT_LIMIT,
   emit,
   executeRun,
-  corsMiddleware
+  corsMiddleware,
+  parseChain,
+  filterActiveProviders
 } = require('./server-helpers')
 
 const app = express()
@@ -53,16 +55,15 @@ app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
     return res.status(400).json({ error: 'prompt (string) is required' })
   }
 
-  let chain = req.body?.chain
-  if (typeof chain === 'string') {
-    try { chain = JSON.parse(chain) } catch {
-      cleanupFiles(req.files)
-      return res.status(400).json({ error: 'chain must be valid JSON' })
-    }
+  let chain;
+  try {
+    chain = parseChain(req.body?.chain, DEFAULT_CHAIN)
+  } catch {
+    cleanupFiles(req.files)
+    return res.status(400).json({ error: 'chain must be valid JSON' })
   }
 
-  const requestedChain = Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
-  const activeChain = requestedChain.filter((step) => PROVIDER_NAMES.includes(step.provider))
+  const activeChain = filterActiveProviders(chain, PROVIDER_NAMES)
   if (activeChain.length === 0) {
     cleanupFiles(req.files)
     return res.status(503).json({

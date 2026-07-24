@@ -12,7 +12,9 @@ const {
   MAX_LIMIT,
   DEFAULT_LIMIT,
   corsMiddleware,
-  executeRun
+  executeRun,
+  parseChain,
+  filterActiveProviders
 } = require('../server-helpers')
 const chainLib = require('../chain')
 
@@ -155,5 +157,27 @@ test('executeRun', async (t) => {
     await executeRun(internalRun, runsMap, () => {})
     
     assert.equal(internalRun.status, 'running')
+  })
+})
+
+test('parseChain', async (t) => {
+  await t.test('returns DEFAULT_CHAIN for undefined', () => {
+    assert.deepEqual(parseChain(undefined, [{ default: true }]), [{ default: true }])
+  })
+
+  await t.test('throws on invalid JSON', () => {
+    assert.throws(() => parseChain('{"invalid"}', []))
+  })
+
+  await t.test('returns parsed array', () => {
+    assert.deepEqual(parseChain('[{"provider":"gemini"}]', []), [{"provider":"gemini"}])
+  })
+})
+
+test('filterActiveProviders', async (t) => {
+  await t.test('returns only providers in PROVIDER_NAMES', () => {
+    const chain = [{ provider: 'foo' }, { provider: 'bar' }, { provider: 'baz' }]
+    const active = ['foo', 'baz']
+    assert.deepEqual(filterActiveProviders(chain, active), [{ provider: 'foo' }, { provider: 'baz' }])
   })
 })
