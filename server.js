@@ -4,6 +4,18 @@ const { version } = require('./package.json')
 const { walkChain, raceChain } = require('./chain')
 const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh } = require('./adapters')
 const { upload, buildPromptWithFiles, cleanupFiles, MAX_FILES, MAX_FILE_BYTES } = require('./uploads')
+const {
+  steeringPrompt,
+  isLocalOrigin,
+  createRun,
+  finalizeRun,
+  EVICT_AFTER_MS,
+  HTTP_NO_CONTENT,
+  DEFAULT_STAGGER_MS,
+  MAX_CONCURRENCY,
+  MAX_LIMIT,
+  DEFAULT_LIMIT
+} = require('./server-helpers')
 
 const app = express()
 app.use(express.json({ limit: '4mb' }))
@@ -12,12 +24,12 @@ app.use(express.json({ limit: '4mb' }))
 // the gateway without a proxy. Restrict to localhost so nothing external can call it.
 app.use((req, res, next) => {
   const origin = req.headers.origin || ''
-  if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+  if (isLocalOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   }
-  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  if (req.method === 'OPTIONS') return res.sendStatus(HTTP_NO_CONTENT)
   next()
 })
 
@@ -31,7 +43,6 @@ app.use((req, res, next) => {
 const runs = new Map()
 
 // Evict completed runs after 10 min so we don't leak memory on a long session.
-const EVICT_AFTER_MS = 10 * 60 * 1000
 function scheduleEvict(id) {
   setTimeout(() => runs.delete(id), EVICT_AFTER_MS)
 }
@@ -48,10 +59,7 @@ function closeSubscribers(run) {
   run.subscribers.clear()
 }
 
-function steeringPrompt(prompt, feedback) {
-  if (feedback.length === 0) return prompt
-  return `${prompt}\n\n## User feedback received while you were responding\n${feedback.map((item) => `- ${item}`).join('\n')}\n\nRevise your approach and answer using this feedback.`
-}
+
 
 function executeRun(run) {
   const prompt = steeringPrompt(run.prompt, run.feedback)
@@ -119,28 +127,18 @@ app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
 
   const id = randomUUID()
   const runCwd = typeof cwd === 'string' && cwd ? cwd : undefined
-  const requestedStagger = req.body?.stagger_ms ?? process.env.GATEWAY_RACE_STAGGER_MS ?? 250
-  const run = {
+  const requestedStagger = req.body?.stagger_ms ?? process.env.GATEWAY_RACE_STAGGER_MS ?? DEFAULT_STAGGER_MS
+  const run = createRun({
     id,
-    session_id: typeof session_id === 'string' ? session_id : null,
-    status: 'running',
-    result: null,
-    error: null,
-    events: [],
-    subscribers: new Set(),
-    kill: null,
+    session_id,
     prompt: buildPromptWithFiles(prompt, req.files),
-    files: req.files || [],
+    files: req.files,
     chain: activeChain,
-    feedback: [],
-    cancelled: false,
-    generation: 0,
-    execution: execution === 'serial' ? 'serial' : 'race',
-    concurrency: Math.max(1, Math.min(Number(req.body?.concurrency) || Number(process.env.GATEWAY_RACE_CONCURRENCY) || 2, 6)),
-    staggerMs: Math.max(0, Number(requestedStagger) || 0),
-    startedAt: Date.now(),
+    execution,
+    concurrency: req.body?.concurrency || process.env.GATEWAY_RACE_CONCURRENCY || 2,
+    staggerMs: requestedStagger,
     cwd: runCwd,
-  }
+  })
   runs.set(id, run)
 
   // Fire-and-forget — active SSE consumers receive events immediately.
@@ -224,8 +222,8 @@ app.post('/runs/:id/feedback', (req, res) => {
 //   ?status=running|complete|error|killed   filter by status
 //   ?limit=N                                 max results (default 50)
 app.get('/runs', (req, res) => {
-  const { status, limit = '50' } = req.query
-  const max = Math.min(parseInt(limit, 10) || 50, 200)
+  const { status, limit = `${DEFAULT_LIMIT}` } = req.query
+  const max = Math.min(parseInt(limit, 10) || DEFAULT_LIMIT, MAX_LIMIT)
 
   let list = [...runs.values()]
     .sort((a, b) => b.startedAt - a.startedAt)
@@ -244,10 +242,7 @@ app.get('/runs', (req, res) => {
     model:       r.result?.model    || null,
     error:       r.error            || null,
     // Truncated prompt from the first chunk or complete event
-    promptSnippet: (() => {
-      const postEvent = r.events.find(e => e.type === 'complete' || e.type === 'chunk')
-      return null  // prompt not stored — see /runs/:id/events for full event log
-    })(),
+    promptSnippet: null, // prompt not stored — see /runs/:id/events for full event log
     eventCount:  r.events.length,
   })))
 })
