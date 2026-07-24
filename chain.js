@@ -37,7 +37,7 @@ function resolveProviderCwd(providerName, requestedCwd) {
  */
 async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
   const { onThinking, onChunk, onKill, cwd, spawnAgent: spawn = spawnAgent } = callbacks
-  const steps = Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
+  const steps = resolveSteps(chain)
   let lastError = null
 
   for (const step of steps) {
@@ -103,7 +103,7 @@ function invalidResponse(response) {
  * response wins and every losing process is cancelled. Chunks are buffered so
  * clients never receive a mixed response from losing providers. */
 function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
-  const steps = Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
+  const steps = resolveSteps(chain)
   const concurrency = Math.max(1, Math.min(Number(callbacks.concurrency) || 2, steps.length, 6))
   const staggerMs = Math.max(0, Number(callbacks.staggerMs) || 0)
   const spawn = callbacks.spawnAgent || spawnAgent
@@ -208,4 +208,8 @@ function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
   })
 }
 
-module.exports = { walkChain, raceChain }
+function resolveSteps(chain) {
+  return Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
+}
+
+module.exports = { walkChain, raceChain, resolveSteps }

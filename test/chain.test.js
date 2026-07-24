@@ -1,7 +1,17 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { raceChain } = require('../chain')
+const { raceChain, resolveSteps } = require('../chain')
+const { DEFAULT_CHAIN } = require('../adapters')
 
+test('resolveSteps handles edge cases and returns valid chains', () => {
+  assert.equal(resolveSteps(null), DEFAULT_CHAIN)
+  assert.equal(resolveSteps(undefined), DEFAULT_CHAIN)
+  assert.equal(resolveSteps([]), DEFAULT_CHAIN)
+  assert.equal(resolveSteps('not an array'), DEFAULT_CHAIN)
+  
+  const valid = [{ provider: 'test' }]
+  assert.equal(resolveSteps(valid), valid)
+})
 test('raceChain returns the first successful provider and kills slower attempts', async () => {
   const killed = []
   const spawn = (argv, { onKill }) => new Promise((resolve) => {
