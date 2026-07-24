@@ -135,62 +135,42 @@ function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
     const launch = (step, index) => {
       if (settled) return
       const adapter = ADAPTERS[step.provider]
-      if (!adapter) {
-        active--
-        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag: step.provider, status: 'skip', reason: 'unknown provider' })
-        finished++
-        maybeFinish()
-        return
+      const tag = adapter ? (step.model ? `${adapter.label}:${step.model}` : adapter.label) : step.provider
+      if (adapter) {
+        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending', parallel: true })
       }
-      const tag = step.model ? `${adapter.label}:${step.model}` : adapter.label
-      callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending', parallel: true })
-      let argv
-      try { argv = buildArgv(step, prompt) } catch (error) {
-        active--
-        lastError = error
-        finished++
-        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: error.message })
-        pump()
-        return
-      }
-      const chunks = []
-      spawn(argv, {
-        cwd: resolveProviderCwd(step.provider, callbacks.cwd),
-        onChunk: (chunk) => chunks.push(chunk),
-        onKill: (kill) => activeKills.set(index, kill),
-      }).then((response) => {
-        active--
-        finished++
-        activeKills.delete(index)
-        if (settled) return
-        if (isQuotaError(response) || invalidResponse(response)) {
-          lastError = new Error(response || 'empty provider response')
-          callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: lastError.message.slice(0, 120) })
-          pump()
-          maybeFinish()
-          return
-        }
-        settled = true
-        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
-        killAll()
-        for (const chunk of chunks) callbacks.onChunk?.(chunk)
-        resolve({ response, step })
-      }).catch((error) => {
-        active--
-        finished++
-        activeKills.delete(index)
-        if (settled) return
-        if (error.message === 'KILLED_BY_CLIENT') {
-          settled = true
-          killAll()
-          reject(error)
-          return
-        }
-        lastError = error
-        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: error.message })
-        pump()
-        maybeFinish()
-      })
+
+      launchProvider(step, prompt, spawn, callbacks.cwd, (kill) => activeKills.set(index, kill))
+        .then(({ status, response, error, chunks }) => {
+          active--
+          finished++
+          activeKills.delete(index)
+          if (settled) return
+
+          if (status === 'skip') {
+            callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'skip', reason: 'unknown provider' })
+            maybeFinish()
+          } else if (status === 'argv_error' || status === 'error') {
+            lastError = error
+            callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: error.message })
+            pump()
+          } else if (status === 'fallback') {
+            lastError = error
+            callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: error.message.slice(0, 120) })
+            pump()
+            maybeFinish()
+          } else if (status === 'killed') {
+            settled = true
+            killAll()
+            reject(error)
+          } else if (status === 'ok') {
+            settled = true
+            callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
+            killAll()
+            for (const chunk of chunks) callbacks.onChunk?.(chunk)
+            resolve({ response, step })
+          }
+        })
     }
 
     const pump = () => {
@@ -212,4 +192,36 @@ function resolveSteps(chain) {
   return Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
 }
 
-module.exports = { walkChain, raceChain, resolveSteps }
+async function launchProvider(step, prompt, spawn, cwd, onKill) {
+  const adapter = ADAPTERS[step.provider]
+  if (!adapter) return { status: 'skip' }
+
+  let argv
+  try {
+    argv = buildArgv(step, prompt)
+  } catch (error) {
+    return { status: 'argv_error', error }
+  }
+
+  const chunks = []
+  try {
+    const response = await spawn(argv, {
+      cwd: resolveProviderCwd(step.provider, cwd),
+      onChunk: (chunk) => chunks.push(chunk),
+      onKill
+    })
+
+    if (isQuotaError(response) || invalidResponse(response)) {
+      return { status: 'fallback', error: new Error(response || 'empty provider response') }
+    }
+
+    return { status: 'ok', response, chunks }
+  } catch (error) {
+    if (error && error.message === 'KILLED_BY_CLIENT') {
+      return { status: 'killed', error }
+    }
+    return { status: 'error', error }
+  }
+}
+
+module.exports = { walkChain, raceChain, resolveSteps, launchProvider }

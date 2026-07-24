@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { raceChain, resolveSteps } = require('../chain')
+const { raceChain, resolveSteps, launchProvider } = require('../chain')
 const { DEFAULT_CHAIN } = require('../adapters')
 
 test('resolveSteps handles edge cases and returns valid chains', () => {
@@ -42,4 +42,39 @@ test('raceChain continues after an early provider failure', async () => {
   ], { spawnAgent: spawn, concurrency: 2, staggerMs: 0 })
 
   assert.equal(result.response, 'ok')
+})
+
+test('launchProvider: unknown adapter -> skip', async () => {
+  const result = await launchProvider({ provider: 'unknown' }, 'prompt', () => {}, '.')
+  assert.equal(result.status, 'skip')
+})
+
+test('launchProvider: valid provider, ok', async () => {
+  const spawn = async (argv, { onChunk }) => {
+    onChunk('chunk1')
+    return 'hello world'
+  }
+  const result = await launchProvider({ provider: 'codex' }, 'prompt', spawn, '.')
+  assert.equal(result.status, 'ok')
+  assert.equal(result.response, 'hello world')
+  assert.deepEqual(result.chunks, ['chunk1'])
+})
+
+test('launchProvider: valid provider, fallback', async () => {
+  const spawn = async () => 'quota exhausted'
+  const result = await launchProvider({ provider: 'codex' }, 'prompt', spawn, '.')
+  assert.equal(result.status, 'fallback')
+  assert.ok(result.error)
+})
+
+test('launchProvider: valid provider, killed', async () => {
+  const spawn = async () => { throw new Error('KILLED_BY_CLIENT') }
+  const result = await launchProvider({ provider: 'codex' }, 'prompt', spawn, '.')
+  assert.equal(result.status, 'killed')
+})
+
+test('launchProvider: valid provider, error', async () => {
+  const spawn = async () => { throw new Error('other error') }
+  const result = await launchProvider({ provider: 'codex' }, 'prompt', spawn, '.')
+  assert.equal(result.status, 'error')
 })
