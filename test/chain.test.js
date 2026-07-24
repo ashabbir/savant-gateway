@@ -78,3 +78,60 @@ test('launchProvider: valid provider, error', async () => {
   const result = await launchProvider({ provider: 'codex' }, 'prompt', spawn, '.')
   assert.equal(result.status, 'error')
 })
+
+test('raceChain: All providers fail -> rejects with ALL_PROVIDERS_EXHAUSTED', async () => {
+  const spawn = async () => { throw new Error('fail') }
+  await assert.rejects(
+    raceChain('hello', [{ provider: 'codex' }, { provider: 'gemini' }], { spawnAgent: spawn }),
+    /ALL_PROVIDERS_EXHAUSTED/
+  )
+})
+
+test('raceChain: Single provider succeeds immediately -> resolves with response', async () => {
+  const spawn = async () => 'success'
+  const result = await raceChain('hello', [{ provider: 'codex' }], { spawnAgent: spawn })
+  assert.equal(result.response, 'success')
+})
+
+test('raceChain: Stagger delay works', async () => {
+  const started = []
+  const spawn = async (argv) => {
+    started.push({ provider: argv[0], time: Date.now() })
+    return new Promise(resolve => setTimeout(() => resolve('ok'), 50))
+  }
+  await raceChain('hello', [{ provider: 'codex' }, { provider: 'gemini' }], { spawnAgent: spawn, staggerMs: 20 })
+  assert.equal(started.length, 2)
+  assert.ok(started[1].time - started[0].time >= 15) // at least ~20ms stagger
+})
+
+test('raceChain: onKill callback receives a kill function', async () => {
+  let killed = false
+  let doKill = null
+  const spawn = async (argv, { onKill }) => {
+    onKill(() => { killed = true })
+    return new Promise(resolve => setTimeout(() => resolve('ok'), 50))
+  }
+  const promise = raceChain('hello', [{ provider: 'codex' }], { spawnAgent: spawn, onKill: (k) => { doKill = k } })
+  setTimeout(() => doKill(), 10)
+  await promise
+  assert.ok(killed)
+})
+
+test('raceChain: Chunks are delivered to onChunk callback only from winning provider', async () => {
+  const chunks = []
+  const spawn = async (argv, { onChunk }) => {
+    if (argv[0] === 'codex') {
+      onChunk('bad-chunk')
+      throw new Error('fail')
+    } else {
+      onChunk('good-chunk')
+      return 'win'
+    }
+  }
+  const result = await raceChain('hello', [{ provider: 'codex' }, { provider: 'gemini' }], {
+    spawnAgent: spawn,
+    onChunk: (c) => chunks.push(c)
+  })
+  assert.equal(result.response, 'win')
+  assert.deepEqual(chunks, ['good-chunk'])
+})

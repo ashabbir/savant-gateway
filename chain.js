@@ -118,71 +118,72 @@ function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
     let lastError = null
 
     const killAll = () => {
-      for (const timer of launchTimers) clearTimeout(timer)
+      launchTimers.forEach(clearTimeout)
       launchTimers.clear()
-      for (const kill of activeKills.values()) kill()
+      activeKills.forEach(kill => kill())
       activeKills.clear()
     }
     callbacks.onKill?.(killAll)
 
-    const maybeFinish = () => {
-      if (!settled && finished === steps.length) {
-        settled = true
-        reject(new Error(`ALL_PROVIDERS_EXHAUSTED. Last: ${lastError?.message || 'unknown'}`))
-      }
-    }
-
-    const launch = (step, index) => {
+    const launch = async (step, index) => {
       if (settled) return
+      
       const adapter = ADAPTERS[step.provider]
       const tag = adapter ? (step.model ? `${adapter.label}:${step.model}` : adapter.label) : step.provider
       if (adapter) {
         callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending', parallel: true })
       }
 
-      launchProvider(step, prompt, spawn, callbacks.cwd, (kill) => activeKills.set(index, kill))
-        .then(({ status, response, error, chunks }) => {
-          active--
-          finished++
-          activeKills.delete(index)
-          if (settled) return
+      const { status, response, error, chunks } = await launchProvider(
+        step, prompt, spawn, callbacks.cwd, (kill) => activeKills.set(index, kill)
+      )
 
-          if (status === 'skip') {
-            callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'skip', reason: 'unknown provider' })
-            maybeFinish()
-          } else if (status === 'argv_error' || status === 'error') {
-            lastError = error
-            callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: error.message })
-            pump()
-          } else if (status === 'fallback') {
-            lastError = error
-            callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: error.message.slice(0, 120) })
-            pump()
-            maybeFinish()
-          } else if (status === 'killed') {
-            settled = true
-            killAll()
-            reject(error)
-          } else if (status === 'ok') {
-            settled = true
-            callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
-            killAll()
-            for (const chunk of chunks) callbacks.onChunk?.(chunk)
-            resolve({ response, step })
-          }
-        })
+      active--
+      finished++
+      activeKills.delete(index)
+      if (settled) return
+
+      switch (status) {
+        case 'skip':
+          callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'skip', reason: 'unknown provider' })
+          break
+        case 'ok':
+          settled = true
+          killAll()
+          callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
+          chunks.forEach(c => callbacks.onChunk?.(c))
+          return resolve({ response, step })
+        case 'killed':
+          settled = true
+          killAll()
+          return reject(error)
+        default:
+          lastError = error
+          callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: status === 'fallback' ? 'fallback' : 'error', reason: error?.message?.slice(0, 120) })
+          break
+      }
+
+      if (finished === steps.length) {
+        settled = true
+        reject(new Error(`ALL_PROVIDERS_EXHAUSTED. Last: ${lastError?.message || 'unknown'}`))
+      } else {
+        pump()
+      }
     }
 
     const pump = () => {
       while (!settled && active < concurrency && nextIndex < steps.length) {
         const index = nextIndex++
+        const step = steps[index]
         active++
-        let timer = null
-        const start = () => { launchTimers.delete(timer); launch(steps[index], index) }
         const delay = staggerMs * index
-        if (delay > 0) { timer = setTimeout(start, delay); launchTimers.add(timer) } else start()
+        if (delay) {
+          const timer = setTimeout(() => { launchTimers.delete(timer); launch(step, index) }, delay)
+          launchTimers.add(timer)
+        } else {
+          launch(step, index)
+        }
       }
-      maybeFinish()
     }
     pump()
   })
