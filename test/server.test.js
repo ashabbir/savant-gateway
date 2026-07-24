@@ -10,8 +10,11 @@ const {
   DEFAULT_STAGGER_MS,
   MAX_CONCURRENCY,
   MAX_LIMIT,
-  DEFAULT_LIMIT
+  DEFAULT_LIMIT,
+  corsMiddleware,
+  executeRun
 } = require('../server-helpers')
+const chainLib = require('../chain')
 
 test('steeringPrompt', async (t) => {
   await t.test('returns prompt unchanged if no feedback', () => {
@@ -77,5 +80,80 @@ test('finalizeRun', async (t) => {
     
     // scheduleEvict uses setTimeout, so we can't easily assert on it synchronously without mocking timers
     // but we can verify it doesn't crash
+  })
+})
+
+test('corsMiddleware', async (t) => {
+  await t.test('allows localhost origins', () => {
+    let headers = {}
+    const req = { headers: { origin: 'http://localhost:3000' }, method: 'GET' }
+    const res = { setHeader: (k, v) => { headers[k] = v } }
+    let calledNext = false
+    const next = () => { calledNext = true }
+    
+    corsMiddleware(req, res, next)
+    assert.equal(headers['Access-Control-Allow-Origin'], 'http://localhost:3000')
+    assert.equal(calledNext, true)
+  })
+
+  await t.test('blocks external origins', () => {
+    let headers = {}
+    const req = { headers: { origin: 'http://evil.com' }, method: 'GET' }
+    const res = { setHeader: (k, v) => { headers[k] = v } }
+    let calledNext = false
+    const next = () => { calledNext = true }
+    
+    corsMiddleware(req, res, next)
+    assert.equal(headers['Access-Control-Allow-Origin'], undefined)
+    assert.equal(calledNext, true)
+  })
+})
+
+test('executeRun', async (t) => {
+  await t.test('sets run.status to complete on success', async () => {
+    test.mock.method(chainLib, 'raceChain', async () => ({ response: 'ok', step: { provider: 'test', model: 'test' } }))
+    const run = createRun({ id: '1', prompt: 'hi' })
+    const runsMap = new Map([['1', run]])
+    
+    await executeRun(run, runsMap, () => {})
+    
+    assert.equal(run.status, 'complete')
+    assert.equal(run.result.response, 'ok')
+  })
+
+  await t.test('sets run.status to error on chain failure', async () => {
+    test.mock.method(chainLib, 'raceChain', async () => { throw new Error('boom') })
+    const run = createRun({ id: '2', prompt: 'hi' })
+    const runsMap = new Map([['2', run]])
+    
+    await executeRun(run, runsMap, () => {})
+    
+    assert.equal(run.status, 'error')
+    assert.equal(run.error, 'boom')
+  })
+
+  await t.test('sets run.status to killed on KILLED_BY_CLIENT', async () => {
+    test.mock.method(chainLib, 'raceChain', async () => { throw new Error('KILLED_BY_CLIENT') })
+    const run = createRun({ id: '3', prompt: 'hi' })
+    const runsMap = new Map([['3', run]])
+    
+    await executeRun(run, runsMap, () => {})
+    
+    assert.equal(run.status, 'killed')
+  })
+
+  await t.test('skips stale generations', async () => {
+    let internalRun;
+    test.mock.method(chainLib, 'raceChain', async () => {
+      internalRun.generation++
+      return { response: 'stale', step: { provider: 'test' } }
+    })
+    
+    internalRun = createRun({ id: '4', prompt: 'hi' })
+    const runsMap = new Map([['4', internalRun]])
+    
+    await executeRun(internalRun, runsMap, () => {})
+    
+    assert.equal(internalRun.status, 'running')
   })
 })

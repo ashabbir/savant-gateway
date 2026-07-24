@@ -1,3 +1,5 @@
+const chainLib = require('./chain')
+
 const EVICT_AFTER_MS = 10 * 60 * 1000
 const HTTP_NO_CONTENT = 204
 const DEFAULT_STAGGER_MS = 250
@@ -16,6 +18,17 @@ function isLocalOrigin(origin) {
   if (origin.startsWith('http://localhost')) return true
   if (origin.startsWith('http://127.0.0.1')) return true
   return false
+}
+
+function corsMiddleware(req, res, next) {
+  const origin = req.headers.origin || ''
+  if (isLocalOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(HTTP_NO_CONTENT)
+  next()
 }
 
 function createRun(params) {
@@ -51,6 +64,51 @@ function finalizeRun(run, runsMap, cleanupFiles) {
   setTimeout(() => runsMap.delete(run.id), EVICT_AFTER_MS)
 }
 
+function emit(run, event) {
+  run.events.push(event)
+  for (const client of run.subscribers) {
+    client.write(`data: ${JSON.stringify(event)}\n\n`)
+  }
+}
+
+async function executeRun(run, runsMap, cleanupFiles) {
+  const prompt = steeringPrompt(run.prompt, run.feedback)
+  run.kill = null
+  const generation = ++run.generation
+  const execute = run.execution === 'serial' ? chainLib.walkChain : chainLib.raceChain
+
+  try {
+    const { response, step } = await execute(prompt, run.chain, {
+      onThinking: (t) => emit(run, { type: 'thinking', ...t }),
+      onChunk:    (c) => emit(run, { type: 'chunk', content: c }),
+      onKill:     (fn) => { run.kill = fn },
+      cwd:        run.cwd,
+      concurrency: run.concurrency,
+      staggerMs: run.staggerMs,
+    })
+
+    if (run.cancelled || generation !== run.generation) return
+
+    run.status = 'complete'
+    run.result = { response, provider: step.provider, model: step.model }
+    emit(run, { type: 'complete', content: response, provider: step.provider, model: step.model })
+    
+    finalizeRun(run, runsMap, cleanupFiles)
+  } catch (err) {
+    if (generation !== run.generation) return
+
+    if (err.message === 'KILLED_BY_CLIENT') {
+      run.status = 'killed'
+    } else {
+      run.status = 'error'
+      run.error = err.message
+    }
+    emit(run, { type: 'error', message: err.message })
+    
+    finalizeRun(run, runsMap, cleanupFiles)
+  }
+}
+
 module.exports = {
   steeringPrompt,
   isLocalOrigin,
@@ -61,5 +119,9 @@ module.exports = {
   DEFAULT_STAGGER_MS,
   MAX_CONCURRENCY,
   MAX_LIMIT,
-  DEFAULT_LIMIT
+  MAX_LIMIT,
+  DEFAULT_LIMIT,
+  emit,
+  executeRun,
+  corsMiddleware
 }

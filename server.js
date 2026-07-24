@@ -14,7 +14,10 @@ const {
   DEFAULT_STAGGER_MS,
   MAX_CONCURRENCY,
   MAX_LIMIT,
-  DEFAULT_LIMIT
+  DEFAULT_LIMIT,
+  emit,
+  executeRun,
+  corsMiddleware
 } = require('./server-helpers')
 
 const app = express()
@@ -22,16 +25,7 @@ app.use(express.json({ limit: '4mb' }))
 
 // CORS — allow any local origin so Quorum renderer and savant-client can reach
 // the gateway without a proxy. Restrict to localhost so nothing external can call it.
-app.use((req, res, next) => {
-  const origin = req.headers.origin || ''
-  if (isLocalOrigin(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  }
-  if (req.method === 'OPTIONS') return res.sendStatus(HTTP_NO_CONTENT)
-  next()
-})
+app.use(corsMiddleware)
 
 // ── In-memory run store ───────────────────────────────────────────────────────
 // Keyed by run id. Each run holds:
@@ -47,55 +41,7 @@ function scheduleEvict(id) {
   setTimeout(() => runs.delete(id), EVICT_AFTER_MS)
 }
 
-function emit(run, event) {
-  run.events.push(event)
-  for (const client of run.subscribers) {
-    client.write(`data: ${JSON.stringify(event)}\n\n`)
-  }
-}
 
-function closeSubscribers(run) {
-  for (const client of run.subscribers) client.end()
-  run.subscribers.clear()
-}
-
-
-
-function executeRun(run) {
-  const prompt = steeringPrompt(run.prompt, run.feedback)
-  run.kill = null
-  const generation = ++run.generation
-  const execute = run.execution === 'serial' ? walkChain : raceChain
-
-  execute(prompt, run.chain, {
-    onThinking: (t) => emit(run, { type: 'thinking', ...t }),
-    onChunk:    (c) => emit(run, { type: 'chunk', content: c }),
-    onKill:     (fn) => { run.kill = fn },
-    cwd:        run.cwd,
-    concurrency: run.concurrency,
-    staggerMs: run.staggerMs,
-  }).then(({ response, step }) => {
-    if (run.cancelled || generation !== run.generation) return
-    run.status = 'complete'
-    run.result = { response, provider: step.provider, model: step.model }
-    emit(run, { type: 'complete', content: response, provider: step.provider, model: step.model })
-    closeSubscribers(run)
-    cleanupFiles(run.files)
-    scheduleEvict(run.id)
-  }).catch((err) => {
-    if (generation !== run.generation) return
-    if (err.message === 'KILLED_BY_CLIENT') {
-      run.status = 'killed'
-    } else {
-      run.status = 'error'
-      run.error = err.message
-    }
-    emit(run, { type: 'error', message: err.message })
-    closeSubscribers(run)
-    cleanupFiles(run.files)
-    scheduleEvict(run.id)
-  })
-}
 
 // ── POST /runs ────────────────────────────────────────────────────────────────
 // Body: { prompt: string, chain?: ChainStep[], model?: string }
@@ -142,7 +88,7 @@ app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
   runs.set(id, run)
 
   // Fire-and-forget — active SSE consumers receive events immediately.
-  executeRun(run)
+  executeRun(run, runs, cleanupFiles)
 
   res.status(202).json({ id, status: 'running' })
 })
@@ -190,9 +136,7 @@ app.delete('/runs/:id', (req, res) => {
   run.kill?.()
   run.status = 'killed'
   emit(run, { type: 'error', message: 'KILLED_BY_CLIENT' })
-  closeSubscribers(run)
-  cleanupFiles(run.files)
-  scheduleEvict(run.id)
+  finalizeRun(run, runs, cleanupFiles)
   res.json({ ok: true })
 })
 
@@ -212,7 +156,7 @@ app.post('/runs/:id/feedback', (req, res) => {
   run.feedback.push(feedback.trim())
   emit(run, { type: 'steering', feedback: feedback.trim(), restart: true })
   run.kill?.()
-  executeRun(run)
+  executeRun(run, runs, cleanupFiles)
   res.status(202).json({ id: run.id, status: 'steering', feedbackCount: run.feedback.length })
 })
 
