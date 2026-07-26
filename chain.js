@@ -99,6 +99,112 @@ function invalidResponse(response) {
   ].some((phrase) => lower.includes(phrase))
 }
 
+class RaceChainSession {
+  constructor(prompt, steps, concurrency, staggerMs, spawn, callbacks, resolve, reject) {
+    this.prompt = prompt
+    this.steps = steps
+    this.concurrency = concurrency
+    this.staggerMs = staggerMs
+    this.spawn = spawn
+    this.callbacks = callbacks
+    this.resolve = resolve
+    this.reject = reject
+
+    this.activeKills = new Map()
+    this.launchTimers = new Set()
+    this.nextIndex = 0
+    this.active = 0
+    this.finished = 0
+    this.settled = false
+    this.lastError = null
+  }
+
+  killAll() {
+    this.launchTimers.forEach(clearTimeout)
+    this.launchTimers.clear()
+    this.activeKills.forEach(kill => kill())
+    this.activeKills.clear()
+  }
+
+  async launch(step, index) {
+    if (this.settled) return
+
+    const adapter = ADAPTERS[step.provider]
+    const tag = adapter ? (step.model ? `${adapter.label}:${step.model}` : adapter.label) : step.provider
+    if (adapter) {
+      this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending', parallel: true })
+    }
+
+    const { status, response, error, chunks } = await launchProvider(
+      step, this.prompt, this.spawn, this.callbacks.cwd, (kill) => this.activeKills.set(index, kill)
+    )
+
+    this.active--
+    this.finished++
+    this.activeKills.delete(index)
+    if (this.settled) return
+
+    const shouldSettle = this._handleStatus(status, response, error, chunks, step, tag)
+    if (shouldSettle) {
+      this.settled = true
+      this.killAll()
+      return
+    }
+
+    if (this.finished === this.steps.length) {
+      this.settled = true
+      this.reject(new Error(`ALL_PROVIDERS_EXHAUSTED. Last: ${this.lastError?.message || 'unknown'}`))
+    } else {
+      this.pump()
+    }
+  }
+
+  _handleStatus(status, response, error, chunks, step, tag) {
+    switch (status) {
+      case 'skip':
+        this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'skip', reason: 'unknown provider' })
+        break
+      case 'ok':
+        this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
+        chunks.forEach(c => this.callbacks.onChunk?.(c))
+        this.resolve({ response, step })
+        return true
+      case 'killed':
+        this.reject(error)
+        return true
+      default:
+        this.lastError = error
+        this.callbacks.onThinking?.({
+          provider: step.provider,
+          model: step.model,
+          tag,
+          status: status === 'fallback' ? 'fallback' : 'error',
+          reason: error?.message?.slice(0, 120)
+        })
+        break
+    }
+    return false
+  }
+
+  pump() {
+    while (!this.settled && this.active < this.concurrency && this.nextIndex < this.steps.length) {
+      const index = this.nextIndex++
+      const step = this.steps[index]
+      this.active++
+      const delay = this.staggerMs * index
+      if (delay) {
+        const timer = setTimeout(() => {
+          this.launchTimers.delete(timer)
+          this.launch(step, index)
+        }, delay)
+        this.launchTimers.add(timer)
+      } else {
+        this.launch(step, index)
+      }
+    }
+  }
+}
+
 /** Race a bounded number of isolated provider subprocesses. The first valid
  * response wins and every losing process is cancelled. Chunks are buffered so
  * clients never receive a mixed response from losing providers. */
@@ -109,83 +215,9 @@ function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
   const spawn = callbacks.spawnAgent || spawnAgent
 
   return new Promise((resolve, reject) => {
-    const activeKills = new Map()
-    const launchTimers = new Set()
-    let nextIndex = 0
-    let active = 0
-    let finished = 0
-    let settled = false
-    let lastError = null
-
-    const killAll = () => {
-      launchTimers.forEach(clearTimeout)
-      launchTimers.clear()
-      activeKills.forEach(kill => kill())
-      activeKills.clear()
-    }
-    callbacks.onKill?.(killAll)
-
-    const launch = async (step, index) => {
-      if (settled) return
-      
-      const adapter = ADAPTERS[step.provider]
-      const tag = adapter ? (step.model ? `${adapter.label}:${step.model}` : adapter.label) : step.provider
-      if (adapter) {
-        callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending', parallel: true })
-      }
-
-      const { status, response, error, chunks } = await launchProvider(
-        step, prompt, spawn, callbacks.cwd, (kill) => activeKills.set(index, kill)
-      )
-
-      active--
-      finished++
-      activeKills.delete(index)
-      if (settled) return
-
-      switch (status) {
-        case 'skip':
-          callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'skip', reason: 'unknown provider' })
-          break
-        case 'ok':
-          settled = true
-          killAll()
-          callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
-          chunks.forEach(c => callbacks.onChunk?.(c))
-          return resolve({ response, step })
-        case 'killed':
-          settled = true
-          killAll()
-          return reject(error)
-        default:
-          lastError = error
-          callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: status === 'fallback' ? 'fallback' : 'error', reason: error?.message?.slice(0, 120) })
-          break
-      }
-
-      if (finished === steps.length) {
-        settled = true
-        reject(new Error(`ALL_PROVIDERS_EXHAUSTED. Last: ${lastError?.message || 'unknown'}`))
-      } else {
-        pump()
-      }
-    }
-
-    const pump = () => {
-      while (!settled && active < concurrency && nextIndex < steps.length) {
-        const index = nextIndex++
-        const step = steps[index]
-        active++
-        const delay = staggerMs * index
-        if (delay) {
-          const timer = setTimeout(() => { launchTimers.delete(timer); launch(step, index) }, delay)
-          launchTimers.add(timer)
-        } else {
-          launch(step, index)
-        }
-      }
-    }
-    pump()
+    const session = new RaceChainSession(prompt, steps, concurrency, staggerMs, spawn, callbacks, resolve, reject)
+    callbacks.onKill?.(() => session.killAll())
+    session.pump()
   })
 }
 
