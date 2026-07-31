@@ -78,7 +78,13 @@ function finalizeRun(run, runsMap, cleanupFiles) {
   if (cleanupFiles && typeof cleanupFiles === 'function') {
     cleanupFiles(run.files)
   }
-  setTimeout(() => runsMap.delete(run.id), EVICT_AFTER_MS)
+  scheduleRunEviction(runsMap, run.id)
+}
+
+function scheduleRunEviction(runsMap, runId) {
+  const timer = setTimeout(() => runsMap.delete(runId), EVICT_AFTER_MS)
+  timer.unref?.()
+  return timer
 }
 
 function emit(run, event) {
@@ -131,6 +137,7 @@ module.exports = {
   isLocalOrigin,
   createRun,
   finalizeRun,
+  scheduleRunEviction,
   EVICT_AFTER_MS,
   HTTP_NO_CONTENT,
   DEFAULT_STAGGER_MS,

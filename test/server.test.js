@@ -5,6 +5,7 @@ const {
   isLocalOrigin,
   createRun,
   finalizeRun,
+  scheduleRunEviction,
   EVICT_AFTER_MS,
   HTTP_NO_CONTENT,
   DEFAULT_STAGGER_MS,
@@ -85,6 +86,12 @@ test('finalizeRun', async (t) => {
     // scheduleEvict uses setTimeout, so we can't easily assert on it synchronously without mocking timers
     // but we can verify it doesn't crash
   })
+})
+
+test('scheduleRunEviction does not keep an otherwise idle process alive', () => {
+  const timer = scheduleRunEviction(new Map(), 'run-id')
+  assert.equal(timer.hasRef(), false)
+  clearTimeout(timer)
 })
 
 test('corsMiddleware', async (t) => {
