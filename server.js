@@ -1,16 +1,11 @@
 const express = require('express')
 const { randomUUID } = require('crypto') // built-in, no dep needed
 const { version } = require('./package.json')
-const { walkChain, raceChain } = require('./chain')
 const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh } = require('./adapters')
 const { upload, buildPromptWithFiles, cleanupFiles, MAX_FILES, MAX_FILE_BYTES } = require('./uploads')
 const {
-  steeringPrompt,
-  isLocalOrigin,
   createRun,
   finalizeRun,
-  EVICT_AFTER_MS,
-  HTTP_NO_CONTENT,
   DEFAULT_STAGGER_MS,
   MAX_CONCURRENCY,
   MAX_LIMIT,
@@ -37,13 +32,6 @@ app.use(corsMiddleware)
 //   events: SSE event objects (append-only ring for active SSE consumers)
 //   kill:   fn | null  (set by the chain walker when a subprocess is active)
 const runs = new Map()
-
-// Evict completed runs after 10 min so we don't leak memory on a long session.
-function scheduleEvict(id) {
-  setTimeout(() => runs.delete(id), EVICT_AFTER_MS)
-}
-
-
 
 // ── POST /runs ────────────────────────────────────────────────────────────────
 // Body: { prompt: string, chain?: ChainStep[], model?: string }
