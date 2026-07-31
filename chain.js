@@ -119,11 +119,18 @@ class RaceChainSession {
     this.lastError = null
   }
 
-  killAll() {
+  cancelOutstanding() {
     this.launchTimers.forEach(clearTimeout)
     this.launchTimers.clear()
     this.activeKills.forEach(kill => kill())
     this.activeKills.clear()
+  }
+
+  cancel() {
+    if (this.settled) return
+    this.settled = true
+    this.cancelOutstanding()
+    this.reject(new Error('KILLED_BY_CLIENT'))
   }
 
   async launch(step, index) {
@@ -147,7 +154,7 @@ class RaceChainSession {
     const shouldSettle = this._handleStatus(status, response, error, chunks, step, tag)
     if (shouldSettle) {
       this.settled = true
-      this.killAll()
+      this.cancelOutstanding()
       return
     }
 
@@ -216,7 +223,7 @@ function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
 
   return new Promise((resolve, reject) => {
     const session = new RaceChainSession(prompt, steps, concurrency, staggerMs, spawn, callbacks, resolve, reject)
-    callbacks.onKill?.(() => session.killAll())
+    callbacks.onKill?.(() => session.cancel())
     session.pump()
   })
 }

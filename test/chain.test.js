@@ -104,16 +104,17 @@ test('raceChain: Stagger delay works', async () => {
   assert.ok(started[1].time - started[0].time >= 15) // at least ~20ms stagger
 })
 
-test('raceChain: onKill callback receives a kill function', async () => {
+test('raceChain: onKill cancels outstanding providers and rejects promptly', async () => {
   let killed = false
   let doKill = null
   const spawn = async (argv, { onKill }) => {
     onKill(() => { killed = true })
-    return new Promise(resolve => setTimeout(() => resolve('ok'), 50))
+    return new Promise(() => {})
   }
   const promise = raceChain('hello', [{ provider: 'codex' }], { spawnAgent: spawn, onKill: (k) => { doKill = k } })
-  setTimeout(() => doKill(), 10)
-  await promise
+  await new Promise(resolve => setImmediate(resolve))
+  doKill()
+  await assert.rejects(promise, /KILLED_BY_CLIENT/)
   assert.ok(killed)
 })
 

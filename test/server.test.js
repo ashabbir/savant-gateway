@@ -35,6 +35,8 @@ test('isLocalOrigin', async (t) => {
   await t.test('returns true for localhost:3000', () => assert.equal(isLocalOrigin('http://localhost:3000'), true))
   await t.test('returns true for 127.0.0.1:8080', () => assert.equal(isLocalOrigin('http://127.0.0.1:8080'), true))
   await t.test('returns false for evil.com', () => assert.equal(isLocalOrigin('http://evil.com'), false))
+  await t.test('rejects look-alike localhost hosts', () => assert.equal(isLocalOrigin('http://localhost.evil.com'), false))
+  await t.test('rejects malformed origins', () => assert.equal(isLocalOrigin('not an origin'), false))
 })
 
 test('createRun', async (t) => {
@@ -179,5 +181,9 @@ test('filterActiveProviders', async (t) => {
     const chain = [{ provider: 'foo' }, { provider: 'bar' }, { provider: 'baz' }]
     const active = ['foo', 'baz']
     assert.deepEqual(filterActiveProviders(chain, active), [{ provider: 'foo' }, { provider: 'baz' }])
+  })
+
+  await t.test('ignores malformed chain steps', () => {
+    assert.deepEqual(filterActiveProviders([null, 'foo', {}, { provider: 'foo' }], ['foo']), [{ provider: 'foo' }])
   })
 })

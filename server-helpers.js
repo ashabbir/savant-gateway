@@ -15,9 +15,13 @@ function steeringPrompt(prompt, feedback) {
 
 function isLocalOrigin(origin) {
   if (!origin) return true
-  if (origin.startsWith('http://localhost')) return true
-  if (origin.startsWith('http://127.0.0.1')) return true
-  return false
+  try {
+    const { hostname, protocol } = new URL(origin)
+    return (protocol === 'http:' || protocol === 'https:')
+      && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]')
+  } catch {
+    return false
+  }
 }
 
 function corsMiddleware(req, res, next) {
@@ -41,7 +45,7 @@ function parseChain(rawChain, defaultChain) {
 }
 
 function filterActiveProviders(chain, activeProviderNames) {
-  return chain.filter((step) => activeProviderNames.includes(step.provider))
+  return chain.filter((step) => step && typeof step.provider === 'string' && activeProviderNames.includes(step.provider))
 }
 
 function createRun(params) {
