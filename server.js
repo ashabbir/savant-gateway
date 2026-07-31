@@ -1,5 +1,5 @@
 const express = require('express')
-const { randomUUID } = require('crypto') // built-in, no dep needed
+const { randomUUID } = require('crypto')
 const { version } = require('./package.json')
 const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh } = require('./adapters')
 const { upload, buildPromptWithFiles, cleanupFiles, MAX_FILES, MAX_FILE_BYTES } = require('./uploads')
@@ -7,14 +7,13 @@ const {
   createRun,
   finalizeRun,
   DEFAULT_STAGGER_MS,
-  MAX_CONCURRENCY,
   MAX_LIMIT,
   DEFAULT_LIMIT,
   emit,
   executeRun,
   corsMiddleware,
   parseChain,
-  filterActiveProviders
+  filterActiveProviders,
 } = require('./server-helpers')
 
 const app = express()
@@ -24,18 +23,13 @@ app.use(express.json({ limit: '4mb' }))
 // the gateway without a proxy. Restrict to localhost so nothing external can call it.
 app.use(corsMiddleware)
 
-// ── In-memory run store ───────────────────────────────────────────────────────
-// Keyed by run id. Each run holds:
-//   status: 'running' | 'complete' | 'error' | 'killed'
-//   result: { response, provider, model } | null
-//   error:  string | null
-//   events: SSE event objects (append-only ring for active SSE consumers)
-//   kill:   fn | null  (set by the chain walker when a subprocess is active)
+/**
+ * In-memory run store
+ * Keyed by run id.
+ */
 const runs = new Map()
 
 // ── POST /runs ────────────────────────────────────────────────────────────────
-// Body: { prompt: string, chain?: ChainStep[], model?: string }
-// Returns: { id: string, status: 'running' }
 app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
   const { prompt, cwd, session_id, execution } = req.body || {}
   if (!prompt || typeof prompt !== 'string') {
@@ -43,7 +37,7 @@ app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
     return res.status(400).json({ error: 'prompt (string) is required' })
   }
 
-  let chain;
+  let chain
   try {
     chain = parseChain(req.body?.chain, DEFAULT_CHAIN)
   } catch {
@@ -76,16 +70,12 @@ app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
   })
   runs.set(id, run)
 
-  // Fire-and-forget — active SSE consumers receive events immediately.
   executeRun(run, runs, cleanupFiles)
 
   res.status(202).json({ id, status: 'running' })
 })
 
 // ── GET /runs/:id/stream ──────────────────────────────────────────────────────
-// SSE stream. Replays buffered events, then receives new events immediately.
-// Each event: `data: <json>\n\n`
-// Closes when the run reaches a terminal state.
 app.get('/runs/:id/stream', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'run not found' })
@@ -106,7 +96,6 @@ app.get('/runs/:id/stream', (req, res) => {
 })
 
 // ── GET /runs/:id ─────────────────────────────────────────────────────────────
-// Polling endpoint — for clients that don't want SSE.
 app.get('/runs/:id', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'run not found' })
@@ -114,7 +103,6 @@ app.get('/runs/:id', (req, res) => {
 })
 
 // ── DELETE /runs/:id ──────────────────────────────────────────────────────────
-// Kill an in-flight run.
 app.delete('/runs/:id', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'run not found' })
@@ -130,8 +118,6 @@ app.delete('/runs/:id', (req, res) => {
 })
 
 // ── POST /runs/:id/feedback ──────────────────────────────────────────────────
-// One-shot CLI providers cannot safely consume a second prompt on stdin. Stop
-// the active process and restart it with the original prompt plus all feedback.
 app.post('/runs/:id/feedback', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'run not found' })
@@ -150,10 +136,6 @@ app.post('/runs/:id/feedback', (req, res) => {
 })
 
 // ── GET /runs ─────────────────────────────────────────────────────────────────
-// Debug: list all runs currently in memory, newest first.
-// Query params:
-//   ?status=running|complete|error|killed   filter by status
-//   ?limit=N                                 max results (default 50)
 app.get('/runs', (req, res) => {
   const { status, limit = `${DEFAULT_LIMIT}` } = req.query
   const max = Math.min(parseInt(limit, 10) || DEFAULT_LIMIT, MAX_LIMIT)
@@ -161,45 +143,42 @@ app.get('/runs', (req, res) => {
   let list = [...runs.values()]
     .sort((a, b) => b.startedAt - a.startedAt)
 
-  if (status) list = list.filter(r => r.status === status)
+  if (status) list = list.filter((r) => r.status === status)
   list = list.slice(0, max)
 
-  res.json(list.map(r => ({
-    id:          r.id,
-    session_id:  r.session_id,
-    status:      r.status,
-    cwd:         r.cwd || null,
-    startedAt:   r.startedAt,
-    elapsedMs:   r.status !== 'running' ? Date.now() - r.startedAt : null,
-    provider:    r.result?.provider || null,
-    model:       r.result?.model    || null,
-    error:       r.error            || null,
-    // Truncated prompt from the first chunk or complete event
-    promptSnippet: null, // prompt not stored — see /runs/:id/events for full event log
-    eventCount:  r.events.length,
+  res.json(list.map((r) => ({
+    id: r.id,
+    session_id: r.session_id,
+    status: r.status,
+    cwd: r.cwd || null,
+    startedAt: r.startedAt,
+    elapsedMs: r.status !== 'running' ? Date.now() - r.startedAt : null,
+    provider: r.result?.provider || null,
+    model: r.result?.model || null,
+    error: r.error || null,
+    promptSnippet: null,
+    eventCount: r.events.length,
   })))
 })
 
 // ── GET /runs/:id/events ──────────────────────────────────────────────────────
-// Debug: full event log for a specific run (thinking steps, chunks, result).
 app.get('/runs/:id/events', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'run not found' })
   res.json({
-    id:         run.id,
+    id: run.id,
     session_id: run.session_id,
-    status:     run.status,
-    cwd:        run.cwd || null,
-    startedAt:  run.startedAt,
-    elapsedMs:  Date.now() - run.startedAt,
-    result:     run.result,
-    error:      run.error,
-    events:     run.events,
+    status: run.status,
+    cwd: run.cwd || null,
+    startedAt: run.startedAt,
+    elapsedMs: Date.now() - run.startedAt,
+    result: run.result,
+    error: run.error,
+    events: run.events,
   })
 })
 
 // ── GET /models ──────────────────────────────────────────────────────────────
-// List all defined providers and their models, indicating if they are enabled.
 app.get('/models', (_req, res) => {
   scheduleModelRefresh()
   const providers = Object.keys(ADAPTERS).map((id) => {
@@ -235,7 +214,7 @@ app.get('/health', (_req, res) => {
       }
     }),
     disabledProviders: DISABLED_PROVIDERS,
-    activeRuns: [...runs.values()].filter(r => r.status === 'running').length,
+    activeRuns: [...runs.values()].filter((r) => r.status === 'running').length,
     execution: {
       default: 'race',
       concurrency: Number(process.env.GATEWAY_RACE_CONCURRENCY) || 2,
@@ -256,13 +235,18 @@ app.use((err, _req, res, _next) => {
 const PORT = Number(process.env.GATEWAY_PORT) || 3100
 const HOST = '127.0.0.1'
 
-app.listen(PORT, HOST, () => {
-  console.log(`[savant-gateway] listening on http://${HOST}:${PORT}`)
-  console.log(`[savant-gateway] providers: ${PROVIDER_NAMES.join(', ')}`)
-  if (DISABLED_PROVIDERS.length > 0) {
-    console.log(`[savant-gateway] disabled providers (cli not found): ${DISABLED_PROVIDERS.join(', ')}`)
-  }
-})
+if (require.main === module) {
+  app.listen(PORT, HOST, () => {
+    console.log(`[savant-gateway] listening on http://${HOST}:${PORT}`)
+    console.log(`[savant-gateway] providers: ${PROVIDER_NAMES.join(', ')}`)
+    if (DISABLED_PROVIDERS.length > 0) {
+      console.log(`[savant-gateway] disabled providers (cli not found): ${DISABLED_PROVIDERS.join(', ')}`)
+    }
+  })
+}
 
-process.on('uncaughtException',  (e) => console.error('[gateway] uncaughtException', e))
+process.on('uncaughtException', (e) => console.error('[gateway] uncaughtException', e))
 process.on('unhandledRejection', (e) => console.error('[gateway] unhandledRejection', e))
+
+module.exports = app
+

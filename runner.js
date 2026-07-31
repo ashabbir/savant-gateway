@@ -2,18 +2,23 @@ const { spawn } = require('child_process')
 const os = require('os')
 const { buildChildEnv } = require('./adapters')
 
-// Five-minute failed attempts make a fallback chain feel unresponsive. Keep
-// the value configurable for longer coding tasks without baking that delay in.
 const HARD_TIMEOUT_MS = Number(process.env.GATEWAY_PROVIDER_TIMEOUT_MS) || 90_000
 
 /**
- * Spawn a CLI agent and return a promise that resolves to its full stdout.
- * Calls onChunk(string) for each stdout chunk so callers can stream.
- * Calls onKill(fn) immediately so callers can wire a kill handle before
- * the process finishes.
+ * Spawns a CLI agent subprocess and streams output.
+ * @param {Array<string>} argv - Command and arguments array.
+ * @param {Object} [options={}]
+ * @param {Function} [options.onChunk] - Stream chunk callback.
+ * @param {Function} [options.onKill] - Callback receiving kill function handle.
+ * @param {string} [options.cwd] - Working directory.
+ * @returns {Promise<string>} Full stdout/stderr content.
  */
 function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
   return new Promise((resolve, reject) => {
+    if (!Array.isArray(argv) || argv.length === 0) {
+      return reject(new Error('Invalid command arguments array'))
+    }
+
     const [cmd, ...args] = argv
     let stdout = ''
     let stderr = ''
@@ -27,6 +32,7 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
       cwd: cwd || os.homedir(),
       env: buildChildEnv({ GEMINI_CLI_TRUST_WORKSPACE: 'true' }),
     })
+
     child.stdin.end()
 
     const clearTimers = () => {
@@ -43,17 +49,27 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
     }
 
     const stopChild = (forceAfterMs) => {
-      try { child.kill('SIGTERM') } catch {}
+      try {
+        child.kill('SIGTERM')
+      } catch {
+        // ignore process kill error
+      }
       escalationTimer = setTimeout(() => {
-        try { child.kill('SIGKILL') } catch {}
+        try {
+          child.kill('SIGKILL')
+        } catch {
+          // ignore process kill error
+        }
       }, forceAfterMs)
     }
 
     // Expose kill handle to caller before we await anything.
-    onKill?.(() => {
-      killed = true
-      stopChild(1_500)
-    })
+    if (typeof onKill === 'function') {
+      onKill(() => {
+        killed = true
+        stopChild(1_500)
+      })
+    }
 
     timeoutTimer = setTimeout(() => {
       timedOut = true
@@ -85,3 +101,4 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
 }
 
 module.exports = { spawnAgent }
+

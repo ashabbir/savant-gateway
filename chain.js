@@ -4,36 +4,39 @@ const fs = require('fs')
 const { ADAPTERS, DEFAULT_CHAIN, isQuotaError, buildArgv } = require('./adapters')
 const { spawnAgent } = require('./runner')
 
-// Providers that maintain a visible session history tied to the CWD (e.g.
-// Copilot CLI records each invocation and shows it when the user opens the
-// CLI in that directory). Running them in a Quorum-internal staging dir
-// keeps the user's project directories clean.
+// Providers that maintain a visible session history tied to the CWD
 const ISOLATED_CWD_PROVIDERS = new Set(['copilot', 'codex', 'gemini', 'agy', 'hermes'])
 
 const QUORUM_STAGING_DIR = path.join(os.homedir(), '.savant', 'quorum', 'gateway-staging')
-try { fs.mkdirSync(QUORUM_STAGING_DIR, { recursive: true }) } catch {}
-
-function resolveProviderCwd(providerName, requestedCwd) {
-  if (requestedCwd) return requestedCwd;
-  if (ISOLATED_CWD_PROVIDERS.has(providerName)) {
-    if (fs.existsSync('/Users/home/code/project-x')) {
-      return '/Users/home/code/project-x';
-    }
-    return QUORUM_STAGING_DIR;
-  }
-  return os.homedir();
+try {
+  fs.mkdirSync(QUORUM_STAGING_DIR, { recursive: true })
+} catch {
+  // ignore directory creation error
 }
 
 /**
- * Walk a provider chain until one succeeds.
- *
- * callbacks:
- *   onThinking({ provider, model, tag, status, reason? }) — called at each step
- *   onChunk(string)   — stdout chunks from the winning provider (for SSE streaming)
- *   onKill(fn)        — called with a kill handle for the in-flight subprocess
- *
- * Returns { response: string, step: { provider, model } }
- * Throws  'ALL_PROVIDERS_EXHAUSTED' if every step fails.
+ * Resolves working directory for provider execution.
+ * @param {string} providerName
+ * @param {string} [requestedCwd]
+ * @returns {string}
+ */
+function resolveProviderCwd(providerName, requestedCwd) {
+  if (requestedCwd) return requestedCwd
+  if (ISOLATED_CWD_PROVIDERS.has(providerName)) {
+    if (fs.existsSync('/Users/home/code/project-x')) {
+      return '/Users/home/code/project-x'
+    }
+    return QUORUM_STAGING_DIR
+  }
+  return os.homedir()
+}
+
+/**
+ * Walk a provider chain sequentially until one succeeds.
+ * @param {string} prompt
+ * @param {Array} [chain=DEFAULT_CHAIN]
+ * @param {Object} [callbacks={}]
+ * @returns {Promise<{response: string, step: Object}>}
  */
 async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
   const { onThinking, onChunk, onKill, cwd, spawnAgent: spawn = spawnAgent } = callbacks
@@ -64,7 +67,7 @@ async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
       const response = await spawn(argv, { onChunk, onKill, cwd: providerCwd })
 
       if (isQuotaError(response) || invalidResponse(response)) {
-        const errorReason = isQuotaError(response) ? 'quota exhausted' : response.slice(0, 120).trim()
+        const errorReason = isQuotaError(response) ? 'quota exhausted' : String(response).slice(0, 120).trim()
         onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: errorReason })
         lastError = new Error(response)
         continue
@@ -72,12 +75,11 @@ async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
 
       onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok' })
       return { response, step }
-
     } catch (err) {
       // KILLED_BY_CLIENT should propagate — don't try the next provider.
-      if (err.message === 'KILLED_BY_CLIENT') throw err
+      if (err && err.message === 'KILLED_BY_CLIENT') throw err
 
-      onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: err.message })
+      onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: err?.message || 'Unknown error' })
       lastError = err
       continue
     }
@@ -86,8 +88,13 @@ async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
   throw new Error(`ALL_PROVIDERS_EXHAUSTED. Last: ${lastError?.message || 'unknown'}`)
 }
 
+/**
+ * Checks if a response string is invalid or an error message.
+ * @param {string} response
+ * @returns {boolean}
+ */
 function invalidResponse(response) {
-  if (!response || !response.trim()) return true
+  if (!response || typeof response !== 'string' || !response.trim()) return true
   const lower = response.toLowerCase()
   if (response.startsWith('Error:') || response.startsWith('ERROR:')) return true
   return [
@@ -122,7 +129,7 @@ class RaceChainSession {
   cancelOutstanding() {
     this.launchTimers.forEach(clearTimeout)
     this.launchTimers.clear()
-    this.activeKills.forEach(kill => kill())
+    this.activeKills.forEach((kill) => kill())
     this.activeKills.clear()
   }
 
@@ -143,7 +150,7 @@ class RaceChainSession {
     }
 
     const { status, response, error, chunks } = await launchProvider(
-      step, this.prompt, this.spawn, this.callbacks.cwd, (kill) => this.activeKills.set(index, kill)
+      step, this.prompt, this.spawn, this.callbacks.cwd, (kill) => this.activeKills.set(index, kill),
     )
 
     this.active--
@@ -173,7 +180,9 @@ class RaceChainSession {
         break
       case 'ok':
         this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
-        chunks.forEach(c => this.callbacks.onChunk?.(c))
+        if (Array.isArray(chunks)) {
+          chunks.forEach((c) => this.callbacks.onChunk?.(c))
+        }
         this.resolve({ response, step })
         return true
       case 'killed':
@@ -186,7 +195,7 @@ class RaceChainSession {
           model: step.model,
           tag,
           status: status === 'fallback' ? 'fallback' : 'error',
-          reason: error?.message?.slice(0, 120)
+          reason: error?.message?.slice(0, 120),
         })
         break
     }
@@ -212,9 +221,13 @@ class RaceChainSession {
   }
 }
 
-/** Race a bounded number of isolated provider subprocesses. The first valid
- * response wins and every losing process is cancelled. Chunks are buffered so
- * clients never receive a mixed response from losing providers. */
+/**
+ * Race a bounded number of isolated provider subprocesses. First valid response wins.
+ * @param {string} prompt
+ * @param {Array} [chain=DEFAULT_CHAIN]
+ * @param {Object} [callbacks={}]
+ * @returns {Promise<{response: string, step: Object}>}
+ */
 function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
   const steps = resolveSteps(chain)
   const concurrency = Math.max(1, Math.min(Number(callbacks.concurrency) || 2, steps.length, 6))
@@ -228,10 +241,24 @@ function raceChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
   })
 }
 
+/**
+ * Resolves chain array or defaults.
+ * @param {Array} chain
+ * @returns {Array}
+ */
 function resolveSteps(chain) {
   return Array.isArray(chain) && chain.length > 0 ? chain : DEFAULT_CHAIN
 }
 
+/**
+ * Spawns provider process and manages output streams.
+ * @param {Object} step
+ * @param {string} prompt
+ * @param {Function} spawn
+ * @param {string} cwd
+ * @param {Function} onKill
+ * @returns {Promise<Object>}
+ */
 async function launchProvider(step, prompt, spawn, cwd, onKill) {
   const adapter = ADAPTERS[step.provider]
   if (!adapter) return { status: 'skip' }
@@ -248,7 +275,7 @@ async function launchProvider(step, prompt, spawn, cwd, onKill) {
     const response = await spawn(argv, {
       cwd: resolveProviderCwd(step.provider, cwd),
       onChunk: (chunk) => chunks.push(chunk),
-      onKill
+      onKill,
     })
 
     if (isQuotaError(response) || invalidResponse(response)) {
@@ -265,3 +292,4 @@ async function launchProvider(step, prompt, spawn, cwd, onKill) {
 }
 
 module.exports = { walkChain, raceChain, resolveSteps, launchProvider }
+

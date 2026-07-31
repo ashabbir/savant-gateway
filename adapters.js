@@ -17,12 +17,20 @@ const EXTRA_PATH_DIRS = [
   '/opt/homebrew/opt/node@22/bin',
 ]
 
+/**
+ * Builds child process environment with expanded PATH directories.
+ * @param {Object} [extra={}]
+ * @returns {Object}
+ */
 function buildChildEnv(extra = {}) {
   const current = process.env.PATH || ''
   const parts = current.split(':').filter(Boolean)
   const seen = new Set(parts)
   for (const dir of EXTRA_PATH_DIRS) {
-    if (!seen.has(dir)) { parts.push(dir); seen.add(dir) }
+    if (!seen.has(dir)) {
+      parts.push(dir)
+      seen.add(dir)
+    }
   }
   return { ...process.env, ...extra, PATH: parts.join(':') }
 }
@@ -42,11 +50,23 @@ const QUOTA_PATTERNS = [
   /\brate[\s_-]?limit_exceeded\b/i,
 ]
 
-const isQuotaError = (res) => res && QUOTA_PATTERNS.some(re => re.test(res))
+/**
+ * Checks if output/error string represents a quota error.
+ * @param {string} res
+ * @returns {boolean}
+ */
+const isQuotaError = (res) => typeof res === 'string' && QUOTA_PATTERNS.some((re) => re.test(res))
 
+/**
+ * Resolves alias to canonical model name.
+ * @param {Object} adapter
+ * @param {string} [model]
+ * @returns {string}
+ */
 function resolveModel(adapter, model) {
+  if (!adapter) return model || ''
   const requested = model || adapter.defaultModel
-  if (requested && Object.hasOwn(adapter.modelAliases || {}, requested)) {
+  if (requested && adapter.modelAliases && Object.hasOwn(adapter.modelAliases, requested)) {
     return adapter.modelAliases[requested]
   }
   return requested
@@ -56,25 +76,24 @@ const HERMES_PYTHON = process.env.HERMES_PYTHON || path.join(
   os.homedir(), '.hermes', 'hermes-agent', 'venv', 'bin', 'python',
 )
 
-// Hermes owns provider authentication and model discovery. Its local API
-// returns only providers with usable credentials, including the account-aware
-// Codex OAuth catalog. Prefix every model with its provider so the adapter can
-// route it back to Hermes without guessing from a model name.
+/**
+ * Discovers available models from local Hermes CLI if installed.
+ * @returns {Array<string>}
+ */
 function discoverHermesModels() {
   if (!fs.existsSync(HERMES_PYTHON)) return []
 
   const probe = spawnSync(HERMES_PYTHON, ['-c', [
     'import json',
     'from hermes_cli.model_switch import list_authenticated_providers',
-    // Do not truncate the authenticated provider catalog. OpenAI accounts can
-    // expose more models than the old fixed 100-item gateway limit.
     'print(json.dumps(list_authenticated_providers(max_models=10000)))',
   ].join('; ')], { encoding: 'utf8', timeout: 5_000 })
 
   if (probe.status !== 0 || !probe.stdout) return []
   try {
     const providers = JSON.parse(probe.stdout)
-    return providers.flatMap((provider) => (provider.models || []).map(
+    if (!Array.isArray(providers)) return []
+    return providers.flatMap((provider) => (provider && Array.isArray(provider.models) ? provider.models : []).map(
       (model) => `${provider.slug}/${model}`,
     ))
   } catch {
@@ -82,6 +101,10 @@ function discoverHermesModels() {
   }
 }
 
+/**
+ * Discovers models from local Codex config directory.
+ * @returns {Array<string>}
+ */
 function discoverCodexModels() {
   const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex')
   const cachePath = path.join(codexHome, 'models_cache.json')
@@ -99,6 +122,10 @@ function discoverCodexModels() {
   }
 }
 
+/**
+ * Discovers models from AGY CLI.
+ * @returns {Array<string>}
+ */
 function discoverAgyModels() {
   const probe = spawnSync('agy', ['models'], {
     env: buildChildEnv(),
@@ -114,7 +141,7 @@ const ADAPTERS = {
     name: 'claude',
     label: 'Claude',
     baseArgv: ['claude', '-p', '--dangerously-skip-permissions'],
-    modelArgv: (model) => model ? ['--model', model] : [],
+    modelArgv: (model) => (model ? ['--model', model] : []),
     promptArgv: (prompt) => [prompt],
     defaultModel: 'haiku',
     availableModels: [
@@ -129,10 +156,8 @@ const ADAPTERS = {
   copilot: {
     name: 'copilot',
     label: 'Copilot',
-    // --allow-all = --allow-all-tools + --allow-all-paths + --allow-all-urls
-    // Prompt must be passed as a flag value, not a positional arg.
     baseArgv: ['copilot', '--allow-all'],
-    modelArgv: (model) => model ? ['--model', model] : [],
+    modelArgv: (model) => (model ? ['--model', model] : []),
     promptArgv: (prompt) => ['--prompt', prompt],
     defaultModel: 'claude-haiku-4.5',
     availableModels: [
@@ -150,7 +175,7 @@ const ADAPTERS = {
     modelAliases: {
       fast: 'gpt-5.5',
     },
-    modelArgv: (model) => model ? ['--model', model, '-c', 'service_tier="fast"'] : [],
+    modelArgv: (model) => (model ? ['--model', model, '-c', 'service_tier="fast"'] : []),
     promptArgv: (prompt) => [prompt],
     defaultModel: 'fast',
     availableModels: [
@@ -162,7 +187,7 @@ const ADAPTERS = {
     name: 'gemini',
     label: 'Gemini',
     baseArgv: ['gemini', '--dangerously-skip-permissions'],
-    modelArgv: (model) => model ? ['--model', model] : [],
+    modelArgv: (model) => (model ? ['--model', model] : []),
     promptArgv: (prompt) => ['--print', prompt],
     defaultModel: 'gemini-2.5-flash',
     availableModels: [
@@ -179,7 +204,7 @@ const ADAPTERS = {
     modelAliases: {
       fast: 'Gemini 3.5 Flash (Low)',
     },
-    modelArgv: (model) => model ? ['--model', model] : [],
+    modelArgv: (model) => (model ? ['--model', model] : []),
     promptArgv: (prompt) => ['-p', prompt],
     defaultModel: 'fast',
     availableModels: [
@@ -197,8 +222,6 @@ const ADAPTERS = {
   hermes: {
     name: 'hermes',
     label: 'Hermes',
-    // --oneshot writes only the final answer to stdout, which is the stable
-    // non-interactive contract Hermes documents for scripts and pipes.
     baseArgv: ['hermes', '--yolo'],
     modelArgv: (model) => {
       if (!model || model === 'configured') return []
@@ -210,8 +233,6 @@ const ADAPTERS = {
       ]
     },
     promptArgv: (prompt) => ['--oneshot', prompt],
-    // Use the user's active Hermes selection by default. Discovered choices
-    // are explicit overrides only; they must never replace config.yaml.
     defaultModel: 'configured',
     availableModels: ['configured'],
   },
@@ -242,6 +263,7 @@ refreshLocalModels()
 const MODEL_REFRESH_TTL_MS = Number(process.env.GATEWAY_MODEL_REFRESH_TTL_MS) || 60_000
 let lastModelRefresh = Date.now()
 let modelRefreshPending = false
+
 function scheduleModelRefresh(force = false) {
   if (modelRefreshPending || (!force && Date.now() - lastModelRefresh < MODEL_REFRESH_TTL_MS)) return
   modelRefreshPending = true
@@ -277,17 +299,22 @@ const DISABLED_PROVIDERS = ALL_PROVIDER_NAMES.filter(
 )
 
 const DEFAULT_CHAIN = [
-  // Keep the normal path fast even when the user's optional Hermes selection
-  // is temporarily unavailable. Explicit Hermes requests still use config.
-  { provider: 'codex',   model: 'fast' },
-  { provider: 'hermes',  model: ADAPTERS.hermes.defaultModel },
-  { provider: 'claude',  model: 'haiku' },
+  { provider: 'codex', model: 'fast' },
+  { provider: 'hermes', model: ADAPTERS.hermes.defaultModel },
+  { provider: 'claude', model: 'haiku' },
   { provider: 'copilot', model: 'claude-haiku-4.5' },
-  { provider: 'gemini',  model: 'gemini-2.5-flash' },
-  { provider: 'agy',     model: 'fast' },
+  { provider: 'gemini', model: 'gemini-2.5-flash' },
+  { provider: 'agy', model: 'fast' },
 ].filter((step) => PROVIDER_NAMES.includes(step.provider))
 
+/**
+ * Builds array of command line arguments for spawning an agent.
+ * @param {Object} step
+ * @param {string} prompt
+ * @returns {Array<string>}
+ */
 function buildArgv(step, prompt) {
+  if (!step || !step.provider) throw new Error('Invalid chain step')
   const adapter = ADAPTERS[step.provider]
   if (!adapter) throw new Error(`Unknown provider: ${step.provider}`)
   const model = resolveModel(adapter, step.model)
@@ -314,3 +341,4 @@ module.exports = {
   scheduleModelRefresh,
   resolveModel,
 }
+
