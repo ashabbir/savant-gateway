@@ -19,6 +19,9 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
     let stderr = ''
     let killed = false
     let timedOut = false
+    let settled = false
+    let timeoutTimer
+    let escalationTimer
 
     const child = spawn(cmd, args, {
       cwd: cwd || os.homedir(),
@@ -26,17 +29,35 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
     })
     child.stdin.end()
 
+    const clearTimers = () => {
+      clearTimeout(timeoutTimer)
+      clearTimeout(escalationTimer)
+    }
+
+    const settle = (error, output) => {
+      if (settled) return
+      settled = true
+      clearTimers()
+      if (error) reject(error)
+      else resolve(output)
+    }
+
+    const stopChild = (forceAfterMs) => {
+      try { child.kill('SIGTERM') } catch {}
+      escalationTimer = setTimeout(() => {
+        try { child.kill('SIGKILL') } catch {}
+      }, forceAfterMs)
+    }
+
     // Expose kill handle to caller before we await anything.
     onKill?.(() => {
       killed = true
-      try { child.kill('SIGTERM') } catch {}
-      setTimeout(() => { try { child.kill('SIGKILL') } catch {} }, 1500)
+      stopChild(1_500)
     })
 
-    const killer = setTimeout(() => {
+    timeoutTimer = setTimeout(() => {
       timedOut = true
-      try { child.kill('SIGTERM') } catch {}
-      setTimeout(() => { try { child.kill('SIGKILL') } catch {} }, 2000)
+      stopChild(2_000)
     }, HARD_TIMEOUT_MS)
 
     child.stdout.on('data', (data) => {
@@ -52,15 +73,13 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
     })
 
     child.on('close', () => {
-      clearTimeout(killer)
-      if (killed)    return reject(new Error('KILLED_BY_CLIENT'))
-      if (timedOut)  return reject(new Error(`AGENT_TIMEOUT after ${HARD_TIMEOUT_MS}ms (${cmd})`))
-      resolve(stdout || stderr)
+      if (killed) return settle(new Error('KILLED_BY_CLIENT'))
+      if (timedOut) return settle(new Error(`AGENT_TIMEOUT after ${HARD_TIMEOUT_MS}ms (${cmd})`))
+      settle(null, stdout || stderr)
     })
 
     child.on('error', (err) => {
-      clearTimeout(killer)
-      reject(err)
+      settle(err)
     })
   })
 }
