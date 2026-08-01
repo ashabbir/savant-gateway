@@ -20,11 +20,7 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
     }
 
     const [cmd, ...args] = argv
-    let stdout = ''
-    let stderr = ''
-    let killed = false
-    let timedOut = false
-    let settled = false
+    const state = { stdout: '', stderr: '', killed: false, timedOut: false, settled: false }
     let timeoutTimer
     let escalationTimer
 
@@ -41,62 +37,60 @@ function spawnAgent(argv, { onChunk, onKill, cwd } = {}) {
     }
 
     const settle = (error, output) => {
-      if (settled) return
-      settled = true
+      if (state.settled) return
+      state.settled = true
       clearTimers()
       if (error) reject(error)
       else resolve(output)
     }
 
     const stopChild = (forceAfterMs) => {
-      try {
-        child.kill('SIGTERM')
-      } catch {
-        // ignore process kill error
-      }
+      try { child.kill('SIGTERM') } catch {}
       escalationTimer = setTimeout(() => {
-        try {
-          child.kill('SIGKILL')
-        } catch {
-          // ignore process kill error
-        }
+        try { child.kill('SIGKILL') } catch {}
       }, forceAfterMs)
     }
 
-    // Expose kill handle to caller before we await anything.
     if (typeof onKill === 'function') {
       onKill(() => {
-        killed = true
+        state.killed = true
         stopChild(1_500)
       })
     }
 
     timeoutTimer = setTimeout(() => {
-      timedOut = true
+      state.timedOut = true
       stopChild(2_000)
     }, HARD_TIMEOUT_MS)
 
-    child.stdout.on('data', (data) => {
-      const chunk = data.toString()
-      stdout += chunk
-      onChunk?.(chunk)
-    })
+    attachChildOutputListeners(child, state, onChunk)
+    attachChildLifecycleListeners(child, state, cmd, settle)
+  })
+}
 
-    child.stderr.on('data', (data) => {
-      const chunk = data.toString()
-      stderr += chunk
-      onChunk?.(chunk)
-    })
+function attachChildOutputListeners(child, state, onChunk) {
+  child.stdout.on('data', (data) => {
+    const chunk = data.toString()
+    state.stdout += chunk
+    onChunk?.(chunk)
+  })
 
-    child.on('close', () => {
-      if (killed) return settle(new Error('KILLED_BY_CLIENT'))
-      if (timedOut) return settle(new Error(`AGENT_TIMEOUT after ${HARD_TIMEOUT_MS}ms (${cmd})`))
-      settle(null, stdout || stderr)
-    })
+  child.stderr.on('data', (data) => {
+    const chunk = data.toString()
+    state.stderr += chunk
+    onChunk?.(chunk)
+  })
+}
 
-    child.on('error', (err) => {
-      settle(err)
-    })
+function attachChildLifecycleListeners(child, state, cmd, settle) {
+  child.on('close', () => {
+    if (state.killed) return settle(new Error('KILLED_BY_CLIENT'))
+    if (state.timedOut) return settle(new Error(`AGENT_TIMEOUT after ${HARD_TIMEOUT_MS}ms (${cmd})`))
+    settle(null, state.stdout || state.stderr)
+  })
+
+  child.on('error', (err) => {
+    settle(err)
   })
 }
 

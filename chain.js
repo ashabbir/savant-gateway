@@ -39,53 +39,61 @@ function resolveProviderCwd(providerName, requestedCwd) {
  * @returns {Promise<{response: string, step: Object}>}
  */
 async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
-  const { onThinking, onChunk, onKill, cwd, spawnAgent: spawn = spawnAgent } = callbacks
   const steps = resolveSteps(chain)
   let lastError = null
 
   for (const step of steps) {
-    const adapter = ADAPTERS[step.provider]
-    if (!adapter) {
-      onThinking?.({ provider: step.provider, model: step.model, tag: step.provider, status: 'skip', reason: 'unknown provider' })
+    const result = await executeWalkStep(step, prompt, callbacks)
+    if (result.type === 'skip') continue
+    if (result.type === 'error') {
+      lastError = result.error
       continue
     }
-
-    const tag = step.model ? `${adapter.label}:${step.model}` : adapter.label
-    onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending' })
-
-    let argv
-    try {
-      argv = buildArgv(step, prompt)
-    } catch (err) {
-      onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: err.message })
-      lastError = err
-      continue
-    }
-
-    try {
-      const providerCwd = resolveProviderCwd(step.provider, cwd)
-      const response = await spawn(argv, { onChunk, onKill, cwd: providerCwd })
-
-      if (isQuotaError(response) || invalidResponse(response)) {
-        const errorReason = isQuotaError(response) ? 'quota exhausted' : String(response).slice(0, 120).trim()
-        onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: errorReason })
-        lastError = new Error(response)
-        continue
-      }
-
-      onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok' })
-      return { response, step }
-    } catch (err) {
-      // KILLED_BY_CLIENT should propagate — don't try the next provider.
-      if (err && err.message === 'KILLED_BY_CLIENT') throw err
-
-      onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: err?.message || 'Unknown error' })
-      lastError = err
-      continue
+    if (result.type === 'ok') {
+      return { response: result.response, step }
     }
   }
 
   throw new Error(`ALL_PROVIDERS_EXHAUSTED. Last: ${lastError?.message || 'unknown'}`)
+}
+
+async function executeWalkStep(step, prompt, callbacks) {
+  const { onThinking, onChunk, onKill, cwd, spawnAgent: spawn = spawnAgent } = callbacks
+  const adapter = ADAPTERS[step.provider]
+  if (!adapter) {
+    onThinking?.({ provider: step.provider, model: step.model, tag: step.provider, status: 'skip', reason: 'unknown provider' })
+    return { type: 'skip' }
+  }
+
+  const tag = step.model ? `${adapter.label}:${step.model}` : adapter.label
+  onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending' })
+
+  let argv
+  try {
+    argv = buildArgv(step, prompt)
+  } catch (err) {
+    onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: err.message })
+    return { type: 'error', error: err }
+  }
+
+  try {
+    const providerCwd = resolveProviderCwd(step.provider, cwd)
+    const response = await spawn(argv, { onChunk, onKill, cwd: providerCwd })
+
+    if (isQuotaError(response) || invalidResponse(response)) {
+      const errorReason = isQuotaError(response) ? 'quota exhausted' : String(response).slice(0, 120).trim()
+      onThinking?.({ provider: step.provider, model: step.model, tag, status: 'fallback', reason: errorReason })
+      return { type: 'error', error: new Error(response) }
+    }
+
+    onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok' })
+    return { type: 'ok', response }
+  } catch (err) {
+    if (err && err.message === 'KILLED_BY_CLIENT') throw err
+
+    onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: err?.message || 'Unknown error' })
+    return { type: 'error', error: err }
+  }
 }
 
 /**
@@ -149,7 +157,7 @@ class RaceChainSession {
       this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'pending', parallel: true })
     }
 
-    const { status, response, error, chunks } = await launchProvider(
+    const outcome = await launchProvider(
       step, this.prompt, this.spawn, this.callbacks.cwd, (kill) => this.activeKills.set(index, kill),
     )
 
@@ -158,6 +166,11 @@ class RaceChainSession {
     this.activeKills.delete(index)
     if (this.settled) return
 
+    this._processOutcome(outcome, step, tag)
+  }
+
+  _processOutcome(outcome, step, tag) {
+    const { status, response, error, chunks } = outcome
     const shouldSettle = this._handleStatus(status, response, error, chunks, step, tag)
     if (shouldSettle) {
       this.settled = true
@@ -174,31 +187,31 @@ class RaceChainSession {
   }
 
   _handleStatus(status, response, error, chunks, step, tag) {
-    switch (status) {
-      case 'skip':
-        this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'skip', reason: 'unknown provider' })
-        break
-      case 'ok':
-        this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
-        if (Array.isArray(chunks)) {
-          chunks.forEach((c) => this.callbacks.onChunk?.(c))
-        }
-        this.resolve({ response, step })
-        return true
-      case 'killed':
-        this.reject(error)
-        return true
-      default:
-        this.lastError = error
-        this.callbacks.onThinking?.({
-          provider: step.provider,
-          model: step.model,
-          tag,
-          status: status === 'fallback' ? 'fallback' : 'error',
-          reason: error?.message?.slice(0, 120),
-        })
-        break
+    if (status === 'skip') {
+      this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'skip', reason: 'unknown provider' })
+      return false
     }
+    if (status === 'ok') {
+      this.callbacks.onThinking?.({ provider: step.provider, model: step.model, tag, status: 'ok', parallel: true })
+      if (Array.isArray(chunks)) {
+        chunks.forEach((c) => this.callbacks.onChunk?.(c))
+      }
+      this.resolve({ response, step })
+      return true
+    }
+    if (status === 'killed') {
+      this.reject(error)
+      return true
+    }
+
+    this.lastError = error
+    this.callbacks.onThinking?.({
+      provider: step.provider,
+      model: step.model,
+      tag,
+      status: status === 'fallback' ? 'fallback' : 'error',
+      reason: error?.message?.slice(0, 120),
+    })
     return false
   }
 
@@ -207,17 +220,22 @@ class RaceChainSession {
       const index = this.nextIndex++
       const step = this.steps[index]
       this.active++
-      const delay = this.staggerMs * index
-      if (delay) {
-        const timer = setTimeout(() => {
-          this.launchTimers.delete(timer)
-          this.launch(step, index)
-        }, delay)
-        this.launchTimers.add(timer)
-      } else {
-        this.launch(step, index)
-      }
+      this._scheduleStepLaunch(step, index)
     }
+  }
+
+  _scheduleStepLaunch(step, index) {
+    const delay = this.staggerMs * index
+    if (!delay) {
+      this.launch(step, index)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      this.launchTimers.delete(timer)
+      this.launch(step, index)
+    }, delay)
+    this.launchTimers.add(timer)
   }
 }
 
@@ -270,6 +288,13 @@ async function launchProvider(step, prompt, spawn, cwd, onKill) {
     return { status: 'argv_error', error }
   }
 
+  return executeProviderSpawn(step, argv, spawn, cwd, onKill)
+}
+
+/**
+ * Executes spawn for a valid provider step and formats result outcome.
+ */
+async function executeProviderSpawn(step, argv, spawn, cwd, onKill) {
   const chunks = []
   try {
     const response = await spawn(argv, {
