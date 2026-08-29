@@ -136,6 +136,36 @@ function discoverAgyModels() {
   return [...new Set(probe.stdout.split(/\r?\n/).map((model) => model.trim()).filter(Boolean))]
 }
 
+/**
+ * Parses the tabular output of `ollama list` into model names.
+ *
+ * @param {string} output
+ * @returns {Array<string>}
+ */
+function parseOllamaModels(output) {
+  if (typeof output !== 'string') return []
+  return [...new Set(output
+    .split(/\r?\n/)
+    .slice(1)
+    .map((line) => line.trim().split(/\s+/)[0])
+    .filter((model) => model && model !== 'NAME'))]
+}
+
+/**
+ * Discovers locally installed Ollama models.
+ *
+ * @returns {Array<string>}
+ */
+function discoverOllamaModels() {
+  const probe = spawnSync('ollama', ['list'], {
+    env: buildChildEnv(),
+    encoding: 'utf8',
+    timeout: 5_000,
+  })
+  if (probe.status !== 0 || !probe.stdout) return []
+  return parseOllamaModels(probe.stdout)
+}
+
 const ADAPTERS = {
   claude: {
     name: 'claude',
@@ -236,6 +266,15 @@ const ADAPTERS = {
     defaultModel: 'configured',
     availableModels: ['configured'],
   },
+  ollama: {
+    name: 'ollama',
+    label: 'Ollama',
+    baseArgv: ['ollama', 'run'],
+    modelArgv: (model) => (model ? [model] : []),
+    promptArgv: (prompt) => [prompt],
+    defaultModel: '',
+    availableModels: [],
+  },
 }
 
 function refreshHermesModels() {
@@ -254,7 +293,10 @@ function refreshLocalModels() {
   if (agyModels.length > 0) {
     ADAPTERS.agy.availableModels = agyModels
   }
-  return { codex: ADAPTERS.codex, agy: ADAPTERS.agy }
+  const ollamaModels = discoverOllamaModels()
+  ADAPTERS.ollama.availableModels = ollamaModels
+  ADAPTERS.ollama.defaultModel = ollamaModels[0] || ''
+  return { codex: ADAPTERS.codex, agy: ADAPTERS.agy, ollama: ADAPTERS.ollama }
 }
 
 refreshHermesModels()
@@ -278,7 +320,7 @@ function scheduleModelRefresh(force = false) {
   })
 }
 
-const ALL_PROVIDER_NAMES = ['claude', 'copilot', 'codex', 'gemini', 'agy', 'hermes']
+const ALL_PROVIDER_NAMES = ['claude', 'copilot', 'codex', 'gemini', 'agy', 'hermes', 'ollama']
 
 function isCommandAvailable(command) {
   const probe = spawnSync('which', [command], {
@@ -305,7 +347,8 @@ const DEFAULT_CHAIN = [
   { provider: 'copilot', model: 'claude-haiku-4.5' },
   { provider: 'gemini', model: 'gemini-2.5-flash' },
   { provider: 'agy', model: 'fast' },
-].filter((step) => PROVIDER_NAMES.includes(step.provider))
+  { provider: 'ollama', model: ADAPTERS.ollama.defaultModel },
+].filter((step) => PROVIDER_NAMES.includes(step.provider) && step.model)
 
 /**
  * Builds array of command line arguments for spawning an agent.
@@ -337,8 +380,9 @@ module.exports = {
   refreshHermesModels,
   discoverCodexModels,
   discoverAgyModels,
+  discoverOllamaModels,
+  parseOllamaModels,
   refreshLocalModels,
   scheduleModelRefresh,
   resolveModel,
 }
-

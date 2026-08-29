@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Savant Arena | AI Solo Duel & Tournament Arena</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="/" class="brand">
+          <div class="brand-icon">🏛️</div>
+          <div>
+            <div class="brand-title">Savant Arena</div>
+            <div class="brand-subtitle">Solo Duel & Tournament</div>
+          </div>
+        </a>
+        <div class="status-badge" id="status-badge">
+          <span class="status-dot"></span>
+          <span>Online</span>
+        </div>
+      </div>
+
+      <!-- Two Main App Sections: 1 Solo Duel (Single Fighter), 2 Grand Tournament -->
+      <div class="nav-tabs">
+        <button class="nav-tab active" id="tab-chat" type="button" data-view="chat">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"></path><path d="M13 19l6-6"></path><path d="M16 16l4 4"></path><path d="M19 21l2-2"></path></svg>
+          <span>🗡️ 1. Solo Duel (Single Fighter)</span>
+        </button>
+        <button class="nav-tab" id="tab-arena" type="button" data-view="arena">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="12 8 8 12 12 16 16 12 12 8"></polygon></svg>
+          <span>🏛️ 2. Grand Tournament</span>
+        </button>
+      </div>
+
+      <!-- Chat Mode Sub-actions -->
+      <div class="chat-sidebar-section" id="chat-sidebar-section">
+        <div class="new-chat-btn-container">
+          <button class="btn-new-chat" id="btn-new-chat" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>New Chat</span>
+          </button>
+        </div>
+
+        <div class="sessions-list-container" id="sessions-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Arena Mode Past Tournaments -->
+      <div class="arena-sidebar-section" id="arena-sidebar-section" style="display: none;">
+        <div class="new-chat-btn-container">
+          <button class="btn-new-chat" id="btn-new-tournament" type="button" style="background: linear-gradient(135deg, #d29922, #a371f7);">
+            <span>⚔️ New Tournament</span>
+          </button>
+        </div>
+
+        <div class="sessions-list-container" id="tournaments-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <span>Savant Arena v2.1.0</span>
+        <button class="btn-icon" id="btn-theme-toggle" title="Toggle theme" type="button"></button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-chat" id="main-workspace">
+      <!-- ════════════════════════════════════════════════════════════════════════
+           SECTION 1: SOLO DUEL (Test a Single Model & Response)
+           ════════════════════════════════════════════════════════════════════════ -->
+      <section class="view-panel" id="view-chat">
+        <!-- Top Control Bar -->
+        <header class="top-bar">
+          <div class="top-bar-left">
+            <button class="btn-sidebar-toggle" id="btn-sidebar-toggle" type="button" title="Toggle Sidebar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+
+            <div class="model-controls">
+              <!-- Provider Selector -->
+              <div class="control-group">
+                <span class="control-label">Provider</span>
+                <select class="select-dropdown" id="provider-select" title="Select AI Provider">
+                  <!-- Populated dynamically -->
+                </select>
+              </div>
+
+              <!-- Model Selector -->
+              <div class="control-group">
+                <span class="control-label">Model</span>
+                <select class="select-dropdown" id="model-select" title="Select Model">
+                  <!-- Populated dynamically -->
+                </select>
+              </div>
+
+              <!-- Mode Selector -->
+              <div class="control-group">
+                <span class="control-label">Mode</span>
+                <select class="select-dropdown" id="mode-select" title="Execution Mode">
+                  <option value="single">Single Fighter</option>
+                  <option value="race">Fast Race</option>
+                  <option value="serial">Failover Chain</option>
+                </select>
+              </div>
+
+              <!-- Refresh Models Button -->
+              <button class="btn-icon" id="btn-refresh-models" title="Refresh local models (Ollama, Gemini, Claude, etc.)" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="top-bar-right">
+            <button class="btn-icon" id="btn-settings" title="System Prompt & Settings" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Config</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Message Flow Container -->
+        <div class="messages-container" id="messages-container">
+          <div class="messages-wrapper" id="messages-wrapper">
+            <!-- Welcome Screen -->
+            <div class="welcome-screen" id="welcome-screen">
+              <div class="welcome-logo">🗡️</div>
+              <h2 class="welcome-title">Solo Duel: Test a Single Fighter Model</h2>
+              <p class="welcome-subtitle">
+                Select any local or cloud AI model above to test individual responses with multi-turn memory, real-time streaming, and live tokens-per-second performance metrics.
+              </p>
+              <div class="suggestions-grid">
+                <div class="suggestion-card" data-prompt="Write an async/await streaming server in Node.js">
+                  <div class="suggestion-title">💻 Code Server</div>
+                  <div class="suggestion-desc">Create a Node.js streaming HTTP server</div>
+                </div>
+                <div class="suggestion-card" data-prompt="Explain how local Ollama LLMs run on Apple Silicon Metal GPU">
+                  <div class="suggestion-title">🧠 Explain Concept</div>
+                  <div class="suggestion-desc">How Ollama runs quantized models locally</div>
+                </div>
+                <div class="suggestion-card" data-prompt="Refactor this function to improve performance and readability">
+                  <div class="suggestion-title">✨ Code Refactor</div>
+                  <div class="suggestion-desc">Clean up and improve readability</div>
+                </div>
+                <div class="suggestion-card" data-prompt="Write a Python script to parse log files and calculate error rates">
+                  <div class="suggestion-title">📊 Data Analysis</div>
+                  <div class="suggestion-desc">Parse logs and summarize stats in Python</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Input Area -->
+        <div class="chat-input-container">
+          <div class="input-box" id="input-box">
+            <div class="files-tray" id="files-tray" style="display: none;"></div>
+
+            <textarea
+              id="chat-textarea"
+              class="chat-textarea"
+              placeholder="Type a message to test this model... (Enter to send, Shift+Enter for newline)"
+              rows="1"
+            ></textarea>
+
+            <div class="input-actions">
+              <div class="input-actions-left">
+                <input type="file" id="file-input" multiple style="display: none;">
+                <button class="btn-upload" id="btn-upload" type="button" title="Attach files">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                  </svg>
+                </button>
+                <span class="input-hint">Cmd+K for new chat</span>
+              </div>
+
+              <button class="btn-send" id="btn-send" type="button" title="Send message">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════════════════
+           SECTION 2: COLOSSEUM ARENA (Tournaments, Tables & Visual Graphs)
+           ════════════════════════════════════════════════════════════════════════ -->
+      <section class="view-panel" id="view-arena" style="display: none;">
+        <!-- Arena Header -->
+        <header class="colosseum-hero-header">
+          <div class="colosseum-hero-content">
+            <div class="colosseum-badge">🏛️ SAVANT COLOSSEUM</div>
+            <h1 class="colosseum-title">Gladiator Model Tournament & Benchmark Arena</h1>
+            <p class="colosseum-desc">
+              Pit models against each other in structured battle trials. Benchmarks run <strong>one model at a time</strong> for pure, unthrottled hardware performance, with comprehensive comparison tables, visual charts, and AI judging.
+            </p>
+          </div>
+        </header>
+
+        <div class="colosseum-scroll-area">
+          <!-- ── TOURNAMENT SETUP WIZARD ── -->
+          <div class="tournament-setup-card" id="tournament-setup-card">
+            <!-- Step 1: Select Gladiators (Participants) -->
+            <div class="setup-section">
+              <div class="setup-section-header">
+                <span class="step-num">1</span>
+                <div>
+                  <h3 class="setup-section-title">Select Gladiators (Models to Compare)</h3>
+                  <p class="setup-section-desc">Choose 2 or more models across your local Ollama and cloud providers.</p>
+                </div>
+              </div>
+
+              <div class="presets-bar">
+                <span class="control-label">Quick Battle Presets:</span>
+                <button class="btn-chip" id="btn-preset-all-ollama" type="button">🦙 Battle of Local Ollama</button>
+                <button class="btn-chip" id="btn-preset-local-cloud" type="button">⚡ Local vs Cloud Titans</button>
+                <button class="btn-chip" id="btn-preset-fastest" type="button">🚀 Fast Sprint Models</button>
+              </div>
+
+              <div class="gladiators-selection-grid" id="gladiators-selection-grid">
+                <!-- Checkbox cards populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Step 2: Select Battle Trial Questions -->
+            <div class="setup-section">
+              <div class="setup-section-header">
+                <span class="step-num">2</span>
+                <div>
+                  <h3 class="setup-section-title">Select Battle Trials (Benchmark Questions)</h3>
+                  <p class="setup-section-desc">Select a curated benchmark suite or add custom prompt challenges.</p>
+                </div>
+              </div>
+
+              <div class="suite-tabs" id="suite-tabs">
+                <!-- Populated dynamically -->
+              </div>
+
+              <div class="questions-selection-list" id="questions-selection-list">
+                <!-- Checkboxes populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Launch Button -->
+            <div class="setup-action-row">
+              <div class="setup-summary-text" id="setup-summary-text">
+                2 Gladiators selected · 4 Battle Trials (8 Total Execution Steps)
+              </div>
+              <button class="btn-launch-colosseum" id="btn-launch-colosseum" type="button">
+                <span>⚔️ Enter the Colosseum (Start Tournament)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ── LIVE BATTLE STATUS / PROGRESS BAR ── -->
+          <div class="battle-progress-card" id="battle-progress-card" style="display: none;">
+            <div class="battle-progress-header">
+              <div class="battle-live-indicator">
+                <span class="live-dot-pulse"></span>
+                <span id="battle-step-text">Trial 1 of 4: Running Gladiator A...</span>
+              </div>
+              <div class="battle-running-badge">⚡ Running 1 Model at a Time (Pure Benchmark)</div>
+            </div>
+            <div class="battle-progress-bar-bg">
+              <div class="battle-progress-bar-fill" id="battle-progress-bar-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- ── TOURNAMENT CHAMPION & RESULTS ── -->
+          <div class="tournament-results-container" id="tournament-results-container" style="display: none;">
+            <!-- Champion Banner -->
+            <div class="champion-banner" id="champion-banner">
+              <div class="champion-trophy">👑</div>
+              <div>
+                <div class="champion-label">COLOSSEUM CHAMPION</div>
+                <div class="champion-name" id="champion-name">Gladiator A (deepseek-r1:8b)</div>
+                <div class="champion-stats" id="champion-stats">Speed: 42.5 tok/s · TTFT: 0.22s · 100% Win Rate</div>
+              </div>
+            </div>
+
+            <!-- ── VISUAL PERFORMANCE GRAPHS / CHARTS ── -->
+            <div class="charts-grid">
+              <!-- Speed Bar Chart -->
+              <div class="chart-card">
+                <div class="chart-card-header">
+                  <h4 class="chart-title">⚡ Generation Speed (Tokens / Second)</h4>
+                  <span class="chart-subtitle">Higher is better (Market Throughput)</span>
+                </div>
+                <div class="chart-container" id="chart-speed-container">
+                  <!-- Rendered via SVG/HTML5 -->
+                </div>
+              </div>
+
+              <!-- TTFT Latency Chart -->
+              <div class="chart-card">
+                <div class="chart-card-header">
+                  <h4 class="chart-title">⏱️ Time to First Token (TTFT Latency)</h4>
+                  <span class="chart-subtitle">Lower is better (Market Responsiveness)</span>
+                </div>
+                <div class="chart-container" id="chart-latency-container">
+                  <!-- Rendered via SVG/HTML5 -->
+                </div>
+              </div>
+            </div>
+
+            <!-- ── COMPREHENSIVE BENCHMARK TABLE ── -->
+            <div class="results-table-card">
+              <div class="table-card-header">
+                <h3 class="table-card-title">📊 Gladiator Benchmark Comparison Table</h3>
+                <button class="btn-icon" id="btn-request-judge" type="button">
+                  <span>🤖 Request AI Judge Scoring</span>
+                </button>
+              </div>
+
+              <div class="table-scroll-wrapper">
+                <table class="colosseum-table" id="tournament-summary-table">
+                  <thead>
+                    <tr>
+                      <th>Gladiator</th>
+                      <th>Provider / Model</th>
+                      <th>Avg Speed (TPS)</th>
+                      <th>Avg TTFT</th>
+                      <th>Avg Turnaround</th>
+                      <th>Total Tokens</th>
+                      <th>Cost Tier</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tournament-summary-tbody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- AI Judge Evaluation Card -->
+            <div class="judge-verdict-card" id="colosseum-judge-card" style="display: none;">
+              <div class="judge-verdict-header">
+                <div class="judge-badge">🤖 Colosseum AI Judge Tournament Verdict</div>
+                <div class="judge-meta" id="colosseum-judge-meta"></div>
+              </div>
+              <div class="judge-verdict-body message-content" id="colosseum-judge-body"></div>
+            </div>
+
+            <!-- ── TRIAL-BY-TRIAL BATTLE LOG ── -->
+            <div class="trials-breakdown-card">
+              <h3 class="table-card-title" style="margin-bottom: 12px;">📜 Trial-by-Trial Battle Responses</h3>
+              <div class="trials-accordion" id="trials-accordion">
+                <!-- Rendered dynamically for each question -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings Modal -->
+    <div class="modal-backdrop" id="settings-modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Colosseum Gateway Configuration</h3>
+          <button class="modal-close" id="btn-close-settings" type="button">&times;</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="input-system-prompt">System Instructions</label>
+          <textarea id="input-system-prompt" class="form-textarea" placeholder="e.g. You are a senior software engineer."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="input-cwd">Working Directory (cwd)</label>
+          <input type="text" id="input-cwd" class="form-input" placeholder="e.g. /Users/username/code/my-project">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+          <button class="btn-icon" id="btn-save-settings" type="button" style="background: var(--accent-primary); color: #fff; border: none; padding: 8px 16px;">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/markdown.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

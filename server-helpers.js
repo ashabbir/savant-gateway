@@ -163,16 +163,23 @@ function emit(run, event) {
  * @param {Map} runsMap
  * @param {Function} [cleanupFiles]
  */
-async function executeRun(run, runsMap, cleanupFiles) {
+async function executeRun(run, runsMap, cleanupFiles, sessionStore) {
   const prompt = steeringPrompt(run.prompt, run.feedback)
   run.kill = null
   const generation = ++run.generation
   const execute = run.execution === 'serial' ? chainLib.walkChain : chainLib.raceChain
+  const startTime = Date.now()
+  let firstTokenTime = null
 
   try {
     const { response, step } = await execute(prompt, run.chain, {
       onThinking: (t) => emit(run, { type: 'thinking', ...t }),
-      onChunk: (c) => emit(run, { type: 'chunk', content: c }),
+      onChunk: (c) => {
+        if (!firstTokenTime) {
+          firstTokenTime = Date.now()
+        }
+        emit(run, { type: 'chunk', content: c })
+      },
       onKill: (fn) => { run.kill = fn },
       cwd: run.cwd,
       concurrency: run.concurrency,
@@ -181,9 +188,43 @@ async function executeRun(run, runsMap, cleanupFiles) {
 
     if (run.cancelled || generation !== run.generation) return
 
+    const endTime = Date.now()
+    const totalMs = endTime - startTime
+    const ttftMs = firstTokenTime ? firstTokenTime - startTime : totalMs
+    const streamMs = firstTokenTime ? endTime - firstTokenTime : totalMs
+    const cleanedResponse = response || ''
+    const tokenCount = Math.max(1, Math.round(cleanedResponse.length / 3.8))
+    const durationSec = (streamMs > 300 ? streamMs : totalMs) / 1000
+    const effectiveSec = Math.max(durationSec, 0.1)
+    const tokensPerSecond = Number((tokenCount / effectiveSec).toFixed(1))
+
+    const stats = {
+      totalTimeMs: totalMs,
+      firstTokenMs: ttftMs,
+      streamTimeMs: streamMs,
+      tokenCount,
+      tokensPerSecond,
+    }
+
     run.status = 'complete'
-    run.result = { response, provider: step.provider, model: step.model }
-    emit(run, { type: 'complete', content: response, provider: step.provider, model: step.model })
+    run.result = { response, provider: step.provider, model: step.model, stats }
+    emit(run, {
+      type: 'complete',
+      content: response,
+      provider: step.provider,
+      model: step.model,
+      stats,
+    })
+
+    if (run.session_id && sessionStore) {
+      sessionStore.addMessage(run.session_id, {
+        role: 'assistant',
+        content: response,
+        provider: step.provider,
+        model: step.model,
+        stats,
+      })
+    }
 
     finalizeRun(run, runsMap, cleanupFiles)
   } catch (err) {

@@ -49,11 +49,11 @@ for _ in {1..20}; do
   sleep 0.5
 done
 
-echo "✓ savant-gateway installed and started"
-echo "  Port : $PORT"
-echo "  Logs : $HOME_DIR/.savant/gateway.log"
-echo "  Plist: $PLIST_DEST"
+echo "✓ savant-arena installed and started"
+echo "  Web UI: http://127.0.0.1:$PORT"
 echo "  Health: $HEALTH_URL"
+echo "  Logs  : $HOME_DIR/.savant/gateway.log"
+echo "  Plist : $PLIST_DEST"
 echo ""
 echo "  Other commands:"
 echo "    launchctl bootout $LAUNCHD_DOMAIN $PLIST_DEST                # stop"

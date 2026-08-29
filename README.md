@@ -2,19 +2,37 @@
 
 Host-native AI provider gateway for the Savant ecosystem.
 
-`savant-gateway` is a lightweight Node.js service that acts as a unified bridge between local AI CLI agents and the Savant ecosystem (like Quorum and savant-client). It provides a REST API to trigger AI runs, supports automatic failover between multiple providers, and streams thinking steps and response chunks via Server-Sent Events (SSE).
+`savant-gateway` is a lightweight Node.js service that acts as a unified bridge between local AI CLI agents and the Savant ecosystem (like Quorum and savant-client). It provides a built-in Web Chat UI, multi-turn persistent conversation sessions, automatic failover/racing between multiple providers, and real-time streaming of thinking steps and response chunks via Server-Sent Events (SSE).
 
 ## Features
 
-- **Unified API**: Single interface for multiple AI CLI agents: Claude, Copilot, Codex, Gemini, AGY, and Hermes.
-- **Failover Chaining**: Automatically falls back to the next provider in the chain if the primary hits a quota or fails.
+- **Built-in Web Chat & Benchmark UI**: Access a clean, host-native chat assistant and Model Arena directly in your browser at `http://127.0.0.1:3100`.
+- **Model Comparison Arena**: Select 2, 3, or more models across any providers (local Ollama or cloud) and benchmark them side-by-side on the same prompt concurrently.
+- **Market Benchmark Standards**: Track industry-standard metrics in real-time:
+  - **TTFT (Time to First Token)**: Latency before first token emission.
+  - **TPS (Tokens per Second)**: Live throughput and generation velocity.
+  - **End-to-End Latency**: Total completion duration.
+  - **Cost Tier & Efficiency**: Free (Local Host) vs Cloud API cost classifications.
+- **Automated AI Judge Evaluation**: One-click AI Judge analyzes side-by-side responses on correctness, completeness, clarity, and conciseness with scored breakdowns and winner rationales.
+- **Market Leaderboard**: Track head-to-head win rates, average generation throughput (tok/s), and TTFT across all models.
+- **Full Multi-Turn Chat**: Multi-turn conversation sessions with chat history, persistent storage, and automatic context formatting across all CLI models.
+- **Dynamic Provider & Model Selection**: Switch between Ollama, Gemini, Claude, Codex, AGY, and Hermes with live model discovery.
+- **Thinking Process Accordion**: Visualizes reasoning thoughts for models like DeepSeek-R1 in real time.
+- **Unified API**: Single interface for multiple AI CLI agents.
+- **Failover Chaining & Racing**: Automatically falls back to the next provider in the chain or races providers in parallel for the fastest response.
 - **SSE Streaming**: Real-time streaming of thinking steps, status updates, and response chunks.
-- **Fast provider racing**: Bounded parallel subprocesses return the first valid provider response and cancel slower attempts.
-- **File uploads**: Multipart runs can attach local files for agents to inspect.
-- **Live steering**: New feedback cancels stale work and immediately restarts with accumulated guidance.
+- **File Uploads**: Drag-and-drop or attach files (PDF, code, text) directly to chat prompts.
+- **Live Steering**: New feedback cancels stale work and immediately restarts with accumulated guidance.
 - **Host-Native Execution**: Spawns agents directly on your machine, leveraging your local credentials and environment.
-- **macOS Integration**: Easy installation as a `launchd` background service.
+- **macOS Integration**: Seamless installation as a `launchd` background service.
 - **Security**: Bound to `127.0.0.1` and restricted to local origins by default.
+
+## Web Chat & Arena UI
+
+Once installed, simply open `http://127.0.0.1:3100` in your browser to:
+- **Chat Mode**: Have multi-turn conversations with local Ollama models (e.g. `deepseek-r1:8b`, `gemma4:12b-it-qat`) or cloud providers with file attachments, Markdown rendering, and live tok/s indicators.
+- **Compare Arena**: Select multiple models or use quick presets ("Ollama Models", "Local vs Cloud", "Fast Models") to run side-by-side evaluations with live benchmark scorecards and vote on the best response.
+- **Leaderboard**: View market performance rankings and win rates.
 
 ## Supported Providers
 
@@ -22,6 +40,7 @@ The gateway probes your `PATH` for the following CLI tools:
 
 | Provider | CLI Command | Notes |
 | :--- | :--- | :--- |
+| **Ollama** | `ollama` | Locally installed models are discovered dynamically with `ollama list` (e.g. `deepseek-r1:8b`, `gemma4:12b-it-qat`). |
 | **Claude** | `claude` | Anthropic's official CLI. |
 | **Copilot** | `copilot` | GitHub Copilot CLI. |
 | **Codex** | `codex` | Codex CLI agent. |
@@ -33,7 +52,7 @@ The gateway probes your `PATH` for the following CLI tools:
 
 - **Node.js**: Version 18 or later is recommended.
 - **macOS**: Required for the `launchd` installation script.
-- **CLI Agents**: One or more of the supported CLI agents must be installed and authenticated in your environment.
+- **CLI Agents**: One or more of the supported CLI agents (e.g. `ollama`, `gemini`, `claude`) installed in your environment.
 
 ## Installation
 
@@ -49,12 +68,35 @@ This script will:
 3. Register and start the service.
 4. Verify the service is healthy.
 
-By default, the gateway listens on `http://127.0.0.1:3100`.
+By default, the gateway and Web UI listen on `http://127.0.0.1:3100`.
 
 ## API Documentation
 
+### `GET /` or `GET /chat`
+Serves the built-in Web Chat UI.
+
+### `GET /sessions`
+Lists all chat sessions with message counts and timestamps.
+
+### `POST /sessions`
+Creates a new persistent chat session.
+```json
+{
+  "title": "My Project Chat",
+  "provider": "ollama",
+  "model": "deepseek-r1:8b",
+  "systemPrompt": "You are an expert developer."
+}
+```
+
+### `GET /sessions/:id`
+Retrieves a session and its full message history.
+
+### `POST /sessions/:id/messages`
+Appends a message to the session, automatically formats conversational history into the prompt, triggers the provider run, and saves the assistant's response to the session when finished. Supports multipart form data for file attachments.
+
 ### `POST /runs`
-Starts a new AI run.
+Starts a new AI run directly. Accepts either `prompt` or a `messages` array:
 
 **JSON request:**
 ```json
