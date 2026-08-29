@@ -29,7 +29,7 @@
       <div class="nav-tabs">
         <button class="nav-tab active" id="tab-chat" type="button" data-view="chat">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"></path><path d="M13 19l6-6"></path><path d="M16 16l4 4"></path><path d="M19 21l2-2"></path></svg>
-          <span>🗡️ 1. Solo Duel (Single Fighter)</span>
+          <span>🗡️ 1. Solo Duel</span>
         </button>
         <button class="nav-tab" id="tab-arena" type="button" data-view="arena">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="12 8 8 12 12 16 16 12 12 8"></polygon></svg>
@@ -45,7 +45,7 @@
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
-            <span>New Chat</span>
+            <span>New Solo Duel</span>
           </button>
         </div>
 
@@ -58,7 +58,7 @@
       <div class="arena-sidebar-section" id="arena-sidebar-section" style="display: none;">
         <div class="new-chat-btn-container">
           <button class="btn-new-chat" id="btn-new-tournament" type="button" style="background: linear-gradient(135deg, #d29922, #a371f7);">
-            <span>⚔️ New Tournament</span>
+            <span>⚔️ Setup Tournament</span>
           </button>
         </div>
 
@@ -205,96 +205,157 @@
       </section>
 
       <!-- ════════════════════════════════════════════════════════════════════════
-           SECTION 2: COLOSSEUM ARENA (Tournaments, Tables & Visual Graphs)
+           SECTION 2: GRAND TOURNAMENT (Stepped Flow: Gladiators -> Trials -> Battle -> Leaderboard)
            ════════════════════════════════════════════════════════════════════════ -->
       <section class="view-panel" id="view-arena" style="display: none;">
-        <!-- Arena Header -->
-        <header class="colosseum-hero-header">
-          <div class="colosseum-hero-content">
-            <div class="colosseum-badge">🏛️ SAVANT COLOSSEUM</div>
-            <h1 class="colosseum-title">Gladiator Model Tournament & Benchmark Arena</h1>
-            <p class="colosseum-desc">
-              Pit models against each other in structured battle trials. Benchmarks run <strong>one model at a time</strong> for pure, unthrottled hardware performance, with comprehensive comparison tables, visual charts, and AI judging.
-            </p>
+        <!-- Top Tournament Stepper Navigation Header -->
+        <header class="tournament-stepper-header">
+          <div class="tournament-stepper-brand">
+            <div class="colosseum-badge">🏛️ SAVANT ARENA</div>
+            <h2 class="colosseum-title" style="font-size: 18px; margin: 0;">Grand Model Tournament</h2>
+          </div>
+
+          <div class="tournament-steps-nav">
+            <button class="step-nav-btn active" id="step-nav-1" type="button" data-step="1">
+              <span class="step-badge">1</span>
+              <span>Select Gladiators</span>
+            </button>
+            <span class="step-nav-arrow">➔</span>
+            <button class="step-nav-btn" id="step-nav-2" type="button" data-step="2">
+              <span class="step-badge">2</span>
+              <span>Select Trials</span>
+            </button>
+            <span class="step-nav-arrow">➔</span>
+            <button class="step-nav-btn" id="step-nav-3" type="button" data-step="3">
+              <span class="step-badge">3</span>
+              <span>Live Battle</span>
+            </button>
+            <span class="step-nav-arrow">➔</span>
+            <button class="step-nav-btn" id="step-nav-4" type="button" data-step="4">
+              <span class="step-badge">4</span>
+              <span>Leaderboard</span>
+            </button>
           </div>
         </header>
 
         <div class="colosseum-scroll-area">
-          <!-- ── TOURNAMENT SETUP WIZARD ── -->
-          <div class="tournament-setup-card" id="tournament-setup-card">
-            <!-- Step 1: Select Gladiators (Participants) -->
-            <div class="setup-section">
-              <div class="setup-section-header">
-                <span class="step-num">1</span>
-                <div>
-                  <h3 class="setup-section-title">Select Gladiators (Models to Compare)</h3>
-                  <p class="setup-section-desc">Choose 2 or more models across your local Ollama and cloud providers.</p>
-                </div>
+          <!-- ── PAGE 1: SELECT GLADIATORS ── -->
+          <div class="tournament-screen" id="screen-gladiators">
+            <div class="screen-header">
+              <div>
+                <h2 class="screen-title">Step 1: Choose Your Gladiators</h2>
+                <p class="screen-desc">Select 2 or more AI models from your local Ollama or cloud providers to duel in the arena.</p>
               </div>
 
               <div class="presets-bar">
-                <span class="control-label">Quick Battle Presets:</span>
+                <span class="control-label">Presets:</span>
                 <button class="btn-chip" id="btn-preset-all-ollama" type="button">🦙 Battle of Local Ollama</button>
                 <button class="btn-chip" id="btn-preset-local-cloud" type="button">⚡ Local vs Cloud Titans</button>
                 <button class="btn-chip" id="btn-preset-fastest" type="button">🚀 Fast Sprint Models</button>
               </div>
-
-              <div class="gladiators-selection-grid" id="gladiators-selection-grid">
-                <!-- Checkbox cards populated dynamically -->
-              </div>
             </div>
 
-            <!-- Step 2: Select Battle Trial Questions -->
-            <div class="setup-section">
-              <div class="setup-section-header">
-                <span class="step-num">2</span>
-                <div>
-                  <h3 class="setup-section-title">Select Battle Trials (Benchmark Questions)</h3>
-                  <p class="setup-section-desc">Select a curated benchmark suite or add custom prompt challenges.</p>
-                </div>
-              </div>
-
-              <div class="suite-tabs" id="suite-tabs">
-                <!-- Populated dynamically -->
-              </div>
-
-              <div class="questions-selection-list" id="questions-selection-list">
-                <!-- Checkboxes populated dynamically -->
-              </div>
+            <div class="gladiators-selection-grid" id="gladiators-selection-grid">
+              <!-- Checkbox cards populated dynamically -->
             </div>
 
-            <!-- Launch Button -->
-            <div class="setup-action-row">
-              <div class="setup-summary-text" id="setup-summary-text">
-                2 Gladiators selected · 4 Battle Trials (8 Total Execution Steps)
+            <div class="screen-footer-actions">
+              <div class="setup-summary-text" id="gladiators-summary-count">
+                2 Gladiators selected
               </div>
-              <button class="btn-launch-colosseum" id="btn-launch-colosseum" type="button">
-                <span>⚔️ Enter the Colosseum (Start Tournament)</span>
+              <button class="btn-launch-colosseum" id="btn-goto-trials" type="button">
+                <span>Select Battle Trials ➔</span>
               </button>
             </div>
           </div>
 
-          <!-- ── LIVE BATTLE STATUS / PROGRESS BAR ── -->
-          <div class="battle-progress-card" id="battle-progress-card" style="display: none;">
-            <div class="battle-progress-header">
-              <div class="battle-live-indicator">
-                <span class="live-dot-pulse"></span>
-                <span id="battle-step-text">Trial 1 of 4: Running Gladiator A...</span>
+          <!-- ── PAGE 2: SELECT TRIALS (QUESTIONS) ── -->
+          <div class="tournament-screen" id="screen-trials" style="display: none;">
+            <div class="screen-header">
+              <div>
+                <h2 class="screen-title">Step 2: Select Battle Trials (Benchmark Questions)</h2>
+                <p class="screen-desc">Choose trial suites to test models on coding, logic, speed, and analytical reasoning.</p>
               </div>
-              <div class="battle-running-badge">⚡ Running 1 Model at a Time (Pure Benchmark)</div>
             </div>
-            <div class="battle-progress-bar-bg">
-              <div class="battle-progress-bar-fill" id="battle-progress-bar-fill" style="width: 0%;"></div>
+
+            <div class="suite-tabs" id="suite-tabs">
+              <!-- Populated dynamically -->
+            </div>
+
+            <div class="questions-selection-list" id="questions-selection-list">
+              <!-- Checkboxes populated dynamically -->
+            </div>
+
+            <div class="screen-footer-actions">
+              <button class="btn-chip" id="btn-backto-gladiators" type="button" style="padding: 10px 16px; font-size: 13px;">
+                <span>⬅ Back to Gladiators</span>
+              </button>
+              <div class="setup-summary-text" id="trials-summary-count">
+                4 Trials selected
+              </div>
+              <button class="btn-launch-colosseum" id="btn-launch-colosseum" type="button">
+                <span>⚔️ Start Tournament Battle ➔</span>
+              </button>
             </div>
           </div>
 
-          <!-- ── TOURNAMENT CHAMPION & RESULTS ── -->
-          <div class="tournament-results-container" id="tournament-results-container" style="display: none;">
+          <!-- ── PAGE 3: LIVE BATTLE ARENA (WHOLE NEW PAGE) ── -->
+          <div class="tournament-screen" id="screen-battle" style="display: none;">
+            <div class="battle-arena-hero">
+              <div class="battle-arena-meta-row">
+                <div class="battle-trial-info">
+                  <div class="meta-tag" id="live-trial-category">Coding & Algorithms</div>
+                  <h2 class="live-trial-title" id="live-trial-title">Trial 1: LRU Cache Implementation</h2>
+                  <div class="live-trial-prompt" id="live-trial-prompt">Implement an LRU Cache in Python with O(1) complexity.</div>
+                </div>
+
+                <div class="battle-gladiator-info">
+                  <span class="meta-tag gold" id="live-gladiator-name">Gladiator A</span>
+                  <div class="live-gladiator-model" id="live-gladiator-model">ollama: deepseek-r1:8b</div>
+                  <div class="live-gladiator-badge" id="live-gladiator-tier">Free (Local Host)</div>
+                </div>
+              </div>
+
+              <!-- Real-time Progress Indicator -->
+              <div class="battle-progress-wrapper">
+                <div class="battle-progress-header">
+                  <div class="battle-live-indicator">
+                    <span class="live-dot-pulse"></span>
+                    <span id="battle-step-text">Trial 1 of 4: Running Gladiator A...</span>
+                  </div>
+                  <div class="battle-running-badge">⚡ Running 1 Model at a Time (Unthrottled Hardware Benchmark)</div>
+                </div>
+                <div class="battle-progress-bar-bg">
+                  <div class="battle-progress-bar-fill" id="battle-progress-bar-fill" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Streaming Output Box for Current Model -->
+            <div class="battle-live-stream-box">
+              <div class="battle-live-stream-header">
+                <div class="stream-header-title">
+                  <span class="stream-dot"></span>
+                  <span>Live Model Generation Output</span>
+                </div>
+                <div class="stream-stats-pill" id="live-stream-stats">
+                  <span>⚡ Benchmarking throughput...</span>
+                </div>
+              </div>
+
+              <div class="battle-live-stream-body message-content" id="live-stream-content">
+                <span class="thinking-spinner"></span> Initializing model generation...
+              </div>
+            </div>
+          </div>
+
+          <!-- ── PAGE 4: GRAND TOURNAMENT LEADERBOARD & RESULTS ── -->
+          <div class="tournament-screen" id="screen-results" style="display: none;">
             <!-- Champion Banner -->
             <div class="champion-banner" id="champion-banner">
               <div class="champion-trophy">👑</div>
               <div>
-                <div class="champion-label">COLOSSEUM CHAMPION</div>
+                <div class="champion-label">COLOSSEUM TOURNAMENT CHAMPION</div>
                 <div class="champion-name" id="champion-name">Gladiator A (deepseek-r1:8b)</div>
                 <div class="champion-stats" id="champion-stats">Speed: 42.5 tok/s · TTFT: 0.22s · 100% Win Rate</div>
               </div>
@@ -306,10 +367,10 @@
               <div class="chart-card">
                 <div class="chart-card-header">
                   <h4 class="chart-title">⚡ Generation Speed (Tokens / Second)</h4>
-                  <span class="chart-subtitle">Higher is better (Market Throughput)</span>
+                  <span class="chart-subtitle">Higher is better (Market Output Throughput)</span>
                 </div>
                 <div class="chart-container" id="chart-speed-container">
-                  <!-- Rendered via SVG/HTML5 -->
+                  <!-- Rendered via HTML5 / SVG -->
                 </div>
               </div>
 
@@ -320,15 +381,15 @@
                   <span class="chart-subtitle">Lower is better (Market Responsiveness)</span>
                 </div>
                 <div class="chart-container" id="chart-latency-container">
-                  <!-- Rendered via SVG/HTML5 -->
+                  <!-- Rendered via HTML5 / SVG -->
                 </div>
               </div>
             </div>
 
-            <!-- ── COMPREHENSIVE BENCHMARK TABLE ── -->
+            <!-- ── GRAND LEADERBOARD COMPARISON TABLE ── -->
             <div class="results-table-card">
               <div class="table-card-header">
-                <h3 class="table-card-title">📊 Gladiator Benchmark Comparison Table</h3>
+                <h3 class="table-card-title">🏆 Colosseum Tournament Leaderboard</h3>
                 <button class="btn-icon" id="btn-request-judge" type="button">
                   <span>🤖 Request AI Judge Scoring</span>
                 </button>
@@ -338,6 +399,7 @@
                 <table class="colosseum-table" id="tournament-summary-table">
                   <thead>
                     <tr>
+                      <th>Rank</th>
                       <th>Gladiator</th>
                       <th>Provider / Model</th>
                       <th>Avg Speed (TPS)</th>
@@ -370,6 +432,12 @@
                 <!-- Rendered dynamically for each question -->
               </div>
             </div>
+
+            <div class="screen-footer-actions" style="margin-top: 16px;">
+              <button class="btn-launch-colosseum" id="btn-restart-tournament" type="button">
+                <span>⚔️ Start New Tournament</span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -379,7 +447,7 @@
     <div class="modal-backdrop" id="settings-modal" style="display: none;">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 class="modal-title">Colosseum Gateway Configuration</h3>
+          <h3 class="modal-title">Savant Arena Configuration</h3>
           <button class="modal-close" id="btn-close-settings" type="button">&times;</button>
         </div>
         <div class="form-group">

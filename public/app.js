@@ -1,7 +1,7 @@
 /**
- * Savant Colosseum Application
- * 1. Chat (Test single model and inspect response with live TPS stats)
- * 2. Colosseum Arena (Tournament setup, sequential one-at-a-time benchmarking, visual charts, tables, AI judging)
+ * Savant Arena Application
+ * 1. Solo Duel (Single Fighter testing with live TPS & thinking process)
+ * 2. Grand Tournament (Multi-step flow: Select Gladiators -> Select Trials -> Live Battle Arena -> Leaderboard & Graphs)
  */
 
 (function () {
@@ -10,6 +10,7 @@
   // Application State
   const state = {
     currentView: 'chat', // 'chat' | 'arena'
+    tournamentStep: 1,   // 1: Gladiators, 2: Trials, 3: Battle, 4: Results
     providers: [],
     providerDetails: [],
     selectedProvider: '',
@@ -25,14 +26,16 @@
     cwd: '',
     theme: localStorage.getItem('savant_theme') || 'dark',
 
-    // Colosseum Tournament State
+    // Tournament State
     benchmarkSuites: [],
-    selectedGladiators: [], // [{ provider, model, label }]
-    selectedQuestions: [],  // [{ id, category, title, prompt }]
+    selectedGladiators: [],
+    selectedQuestions: [],
     currentTournamentId: null,
     currentTournament: null,
     tournamentPollTimer: null,
     isTournamentRunning: false,
+    activeBattleEventSource: null,
+    currentActiveBattleRunId: null,
     activeJudgeEventSource: null,
   }
 
@@ -77,24 +80,46 @@
     inputSystemPrompt: document.getElementById('input-system-prompt'),
     inputCwd: document.getElementById('input-cwd'),
 
-    // Tournament Wizard & Results
-    tournamentSetupCard: document.getElementById('tournament-setup-card'),
+    // Stepper Navigation
+    stepNav1: document.getElementById('step-nav-1'),
+    stepNav2: document.getElementById('step-nav-2'),
+    stepNav3: document.getElementById('step-nav-3'),
+    stepNav4: document.getElementById('step-nav-4'),
+
+    // Tournament Stepper Screens
+    screenGladiators: document.getElementById('screen-gladiators'),
+    screenTrials: document.getElementById('screen-trials'),
+    screenBattle: document.getElementById('screen-battle'),
+    screenResults: document.getElementById('screen-results'),
+
+    // Step 1: Gladiators
     gladiatorsSelectionGrid: document.getElementById('gladiators-selection-grid'),
-    suiteTabs: document.getElementById('suite-tabs'),
-    questionsSelectionList: document.getElementById('questions-selection-list'),
-    setupSummaryText: document.getElementById('setup-summary-text'),
-    btnLaunchColosseum: document.getElementById('btn-launch-colosseum'),
+    gladiatorsSummaryCount: document.getElementById('gladiators-summary-count'),
+    btnGotoTrials: document.getElementById('btn-goto-trials'),
     btnPresetAllOllama: document.getElementById('btn-preset-all-ollama'),
     btnPresetLocalCloud: document.getElementById('btn-preset-local-cloud'),
     btnPresetFastest: document.getElementById('btn-preset-fastest'),
 
-    // Live Battle Progress
-    battleProgressCard: document.getElementById('battle-progress-card'),
+    // Step 2: Trials
+    suiteTabs: document.getElementById('suite-tabs'),
+    questionsSelectionList: document.getElementById('questions-selection-list'),
+    trialsSummaryCount: document.getElementById('trials-summary-count'),
+    btnBacktoGladiators: document.getElementById('btn-backto-gladiators'),
+    btnLaunchColosseum: document.getElementById('btn-launch-colosseum'),
+
+    // Step 3: Live Battle Arena Screen
+    liveTrialCategory: document.getElementById('live-trial-category'),
+    liveTrialTitle: document.getElementById('live-trial-title'),
+    liveTrialPrompt: document.getElementById('live-trial-prompt'),
+    liveGladiatorName: document.getElementById('live-gladiator-name'),
+    liveGladiatorModel: document.getElementById('live-gladiator-model'),
+    liveGladiatorTier: document.getElementById('live-gladiator-tier'),
     battleStepText: document.getElementById('battle-step-text'),
     battleProgressBarFill: document.getElementById('battle-progress-bar-fill'),
+    liveStreamStats: document.getElementById('live-stream-stats'),
+    liveStreamContent: document.getElementById('live-stream-content'),
 
-    // Tournament Results
-    tournamentResultsContainer: document.getElementById('tournament-results-container'),
+    // Step 4: Results & Leaderboard
     championBanner: document.getElementById('champion-banner'),
     championName: document.getElementById('champion-name'),
     championStats: document.getElementById('champion-stats'),
@@ -106,6 +131,7 @@
     colosseumJudgeMeta: document.getElementById('colosseum-judge-meta'),
     colosseumJudgeBody: document.getElementById('colosseum-judge-body'),
     trialsAccordion: document.getElementById('trials-accordion'),
+    btnRestartTournament: document.getElementById('btn-restart-tournament'),
   }
 
   // ── Theme Management ──
@@ -120,7 +146,7 @@
     }
   }
 
-  // ── View Switching (Chat vs Colosseum Arena) ──
+  // ── View Switching (Solo Duel vs Grand Tournament) ──
   function switchView(viewName) {
     state.currentView = viewName
 
@@ -137,7 +163,30 @@
       loadTournamentQuestions()
       loadTournaments()
       renderGladiatorCheckboxes()
+      if (!state.isTournamentRunning && !state.currentTournament) {
+        goToTournamentStep(1)
+      }
     }
+  }
+
+  // ── Stepped Tournament Router ──
+  function goToTournamentStep(stepNum) {
+    state.tournamentStep = stepNum
+
+    // Update Nav Step Buttons
+    const navs = [el.stepNav1, el.stepNav2, el.stepNav3, el.stepNav4]
+    navs.forEach((nav, idx) => {
+      if (!nav) return
+      const stepIdx = idx + 1
+      nav.classList.toggle('active', stepIdx === stepNum)
+      nav.classList.toggle('completed', stepIdx < stepNum)
+    })
+
+    // Show / Hide Dedicated Screens
+    if (el.screenGladiators) el.screenGladiators.style.display = stepNum === 1 ? 'flex' : 'none'
+    if (el.screenTrials) el.screenTrials.style.display = stepNum === 2 ? 'flex' : 'none'
+    if (el.screenBattle) el.screenBattle.style.display = stepNum === 3 ? 'flex' : 'none'
+    if (el.screenResults) el.screenResults.style.display = stepNum === 4 ? 'flex' : 'none'
   }
 
   // ── Fetch Models & Providers ──
@@ -226,7 +275,7 @@
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // 🏛️ COLOSSEUM ARENA TOURNAMENT ENGINE (ONE MODEL AT A TIME BENCHMARK)
+  // 🏛️ GRAND TOURNAMENT ENGINE (SELECT -> TRIALS -> LIVE ARENA -> LEADERBOARD)
   // ════════════════════════════════════════════════════════════════════════
 
   async function loadTournamentQuestions() {
@@ -269,7 +318,6 @@
       }
     }
 
-    // Default select initial gladiators if none selected
     if (state.selectedGladiators.length === 0 && allGladiators.length >= 2) {
       state.selectedGladiators = allGladiators.slice(0, 2)
     }
@@ -280,7 +328,7 @@
       card.className = `gladiator-card ${isSelected ? 'selected' : ''}`
 
       const icon = g.isLocal ? '🦙' : (g.provider === 'gemini' ? '♊' : (g.provider === 'claude' ? '🧠' : '⚡'))
-      const tierBadge = g.isLocal ? '<span class="tier-badge local">Local</span>' : '<span class="tier-badge">Cloud</span>'
+      const tierBadge = g.isLocal ? '<span class="tier-badge local">Free (Local)</span>' : '<span class="tier-badge">Cloud API</span>'
 
       card.innerHTML = `
         <input type="checkbox" ${isSelected ? 'checked' : ''} style="cursor: pointer;">
@@ -306,13 +354,19 @@
           state.selectedGladiators = state.selectedGladiators.filter((sg) => !(sg.provider === g.provider && sg.model === g.model))
         }
 
-        updateSetupSummary()
+        updateGladiatorsSummary()
       }
 
       el.gladiatorsSelectionGrid.appendChild(card)
     })
 
-    updateSetupSummary()
+    updateGladiatorsSummary()
+  }
+
+  function updateGladiatorsSummary() {
+    if (el.gladiatorsSummaryCount) {
+      el.gladiatorsSummaryCount.textContent = `${state.selectedGladiators.length} Gladiators selected`
+    }
   }
 
   function renderSuiteTabs() {
@@ -331,7 +385,6 @@
       el.suiteTabs.appendChild(tab)
     })
 
-    // Default to first suite
     renderQuestionsList(state.benchmarkSuites[0].questions)
   }
 
@@ -364,21 +417,19 @@
         } else {
           state.selectedQuestions = state.selectedQuestions.filter((sq) => sq.id !== q.id)
         }
-        updateSetupSummary()
+        updateTrialsSummary()
       }
 
       el.questionsSelectionList.appendChild(item)
     })
 
-    updateSetupSummary()
+    updateTrialsSummary()
   }
 
-  function updateSetupSummary() {
-    if (!el.setupSummaryText) return
-    const gCount = state.selectedGladiators.length
-    const qCount = state.selectedQuestions.length
-    const totalSteps = gCount * qCount
-    el.setupSummaryText.textContent = `${gCount} Gladiators selected · ${qCount} Battle Trials (${totalSteps} Total Execution Steps)`
+  function updateTrialsSummary() {
+    if (el.trialsSummaryCount) {
+      el.trialsSummaryCount.textContent = `${state.selectedQuestions.length} Trials selected`
+    }
   }
 
   // ── Arena Presets ──
@@ -417,7 +468,7 @@
     renderGladiatorCheckboxes()
   }
 
-  // ── Start Tournament ──
+  // ── Launch Tournament ──
   async function startColosseumTournament() {
     if (state.selectedGladiators.length < 2) {
       alert('Please select at least 2 gladiators to enter the Colosseum.')
@@ -432,13 +483,12 @@
     if (state.isTournamentRunning) return
     state.isTournamentRunning = true
 
-    if (el.btnLaunchColosseum) {
-      el.btnLaunchColosseum.disabled = true
-      el.btnLaunchColosseum.textContent = '⚔️ Battle Underway...'
-    }
+    // Switch to Dedicated Page 3: Live Battle Arena Screen!
+    goToTournamentStep(3)
 
-    if (el.battleProgressCard) el.battleProgressCard.style.display = 'flex'
-    if (el.tournamentResultsContainer) el.tournamentResultsContainer.style.display = 'none'
+    if (el.liveStreamContent) {
+      el.liveStreamContent.innerHTML = '<span class="thinking-spinner"></span> Initializing Colosseum battle sequence...'
+    }
 
     try {
       const res = await fetch('/tournaments', {
@@ -460,17 +510,13 @@
       state.currentTournamentId = tournament.id
       state.currentTournament = tournament
 
-      // Start polling tournament progress
       pollTournamentProgress(tournament.id)
       loadTournaments()
     } catch (err) {
       console.error('[gateway] startTournament error:', err)
       alert(`Tournament start failed: ${err.message}`)
       state.isTournamentRunning = false
-      if (el.btnLaunchColosseum) {
-        el.btnLaunchColosseum.disabled = false
-        el.btnLaunchColosseum.textContent = '⚔️ Enter the Colosseum'
-      }
+      goToTournamentStep(1)
     }
   }
 
@@ -489,22 +535,38 @@
 
         const curQ = tournament.questions[tournament.currentQuestionIndex]
         const curP = tournament.participants[tournament.currentParticipantIndex]
-        if (el.battleStepText && curQ && curP) {
-          el.battleStepText.textContent = `Trial ${tournament.currentQuestionIndex + 1} of ${tournament.questions.length}: Testing ${curP.gladiatorName} (${curP.model})... [${pct}%]`
+
+        if (curQ && curP) {
+          if (el.liveTrialCategory) el.liveTrialCategory.textContent = curQ.category
+          if (el.liveTrialTitle) el.liveTrialTitle.textContent = `Trial ${tournament.currentQuestionIndex + 1}: ${curQ.title}`
+          if (el.liveTrialPrompt) el.liveTrialPrompt.textContent = curQ.prompt
+
+          if (el.liveGladiatorName) el.liveGladiatorName.textContent = curP.gladiatorName
+          if (el.liveGladiatorModel) el.liveGladiatorModel.textContent = `${curP.provider}: ${curP.model}`
+          if (el.liveGladiatorTier) el.liveGladiatorTier.textContent = curP.isLocal ? 'Free (Local Host)' : 'Cloud API'
+
+          if (el.battleStepText) {
+            el.battleStepText.textContent = `Step ${tournament.completedSteps + 1} of ${tournament.totalSteps}: Fighting ${curP.gladiatorName} (${curP.model})... [${pct}%]`
+          }
+
+          // Inspect run response if completed
+          const activeRun = curQ.runs[curP.gladiatorKey]
+          if (activeRun && activeRun.response && el.liveStreamContent) {
+            el.liveStreamContent.innerHTML = window.SavantMarkdown.render(activeRun.response)
+            if (activeRun.benchmark && el.liveStreamStats) {
+              el.liveStreamStats.innerHTML = `⚡ ${activeRun.benchmark.tokensPerSecond} tok/s · TTFT: ${(activeRun.benchmark.firstTokenMs / 1000).toFixed(2)}s · ${activeRun.benchmark.totalSec}s`
+            }
+          }
         }
 
-        // Check if finished
+        // Check if tournament finished
         if (tournament.status === 'completed' || tournament.completedSteps >= tournament.totalSteps) {
           clearInterval(state.tournamentPollTimer)
           state.tournamentPollTimer = null
           state.isTournamentRunning = false
 
-          if (el.battleProgressCard) el.battleProgressCard.style.display = 'none'
-          if (el.btnLaunchColosseum) {
-            el.btnLaunchColosseum.disabled = false
-            el.btnLaunchColosseum.textContent = '⚔️ Enter the Colosseum (Start Tournament)'
-          }
-
+          // Switch to Dedicated Page 4: Grand Leaderboard & Results!
+          goToTournamentStep(4)
           renderTournamentResults(tournament)
           loadTournaments()
         }
@@ -514,11 +576,8 @@
     }, 1500)
   }
 
-  // ── Render Tournament Results, Tables & Visual Graphs ──
+  // ── Render Leaderboard & Visual Performance Graphs (Page 4) ──
   function renderTournamentResults(t) {
-    if (!el.tournamentResultsContainer) return
-    el.tournamentResultsContainer.style.display = 'flex'
-
     // Champion Banner
     if (t.champion) {
       if (el.championBanner) el.championBanner.style.display = 'flex'
@@ -535,9 +594,6 @@
 
     // Trial-by-Trial Accordion
     renderTrialsAccordion(t.questions || [], t.participants || [])
-
-    // Smooth scroll down to results
-    el.tournamentResultsContainer.scrollIntoView({ behavior: 'smooth' })
   }
 
   function renderSpeedChart(series) {
@@ -600,6 +656,7 @@
       const costBadge = r.isLocal ? '<span class="tier-badge local">Free (Local)</span>' : '<span class="tier-badge">Cloud API</span>'
 
       tr.innerHTML = `
+        <td><strong>#${idx + 1}</strong></td>
         <td><strong>${idx === 0 ? '👑 ' : ''}${window.SavantMarkdown.escapeHtml(r.gladiator)}</strong></td>
         <td><code>${window.SavantMarkdown.escapeHtml(r.model)}</code></td>
         <td><strong style="color: #d29922;">${r.avgTps} tok/s</strong></td>
@@ -770,6 +827,7 @@
         if (res.ok) {
           const fullT = await res.json()
           state.currentTournament = fullT
+          goToTournamentStep(4)
           renderTournamentResults(fullT)
         }
       }
@@ -779,7 +837,7 @@
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // 💬 SECTION 1: CHAT APPLICATION LOGIC
+  // 🗡️ SECTION 1: SOLO DUEL CHAT APPLICATION LOGIC
   // ════════════════════════════════════════════════════════════════════════
 
   async function loadSessions() {
@@ -798,13 +856,13 @@
     el.sessionsList.innerHTML = ''
 
     if (sessions.length === 0) {
-      el.sessionsList.innerHTML = '<div style="padding: 12px 10px; font-size: 12px; color: var(--text-muted);">No chats yet</div>'
+      el.sessionsList.innerHTML = '<div style="padding: 12px 10px; font-size: 12px; color: var(--text-muted);">No duels yet</div>'
       return
     }
 
     const label = document.createElement('div')
     label.className = 'sessions-section-label'
-    label.textContent = 'Recent Chats'
+    label.textContent = 'Recent Duels'
     el.sessionsList.appendChild(label)
 
     for (const s of sessions) {
@@ -817,7 +875,7 @@
 
       const title = document.createElement('div')
       title.className = 'session-item-title'
-      title.textContent = s.title || 'New Chat'
+      title.textContent = s.title || 'Solo Duel'
       content.appendChild(title)
 
       const meta = document.createElement('div')
@@ -829,7 +887,7 @@
 
       const delBtn = document.createElement('button')
       delBtn.className = 'session-delete-btn'
-      delBtn.title = 'Delete chat'
+      delBtn.title = 'Delete duel'
       delBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>'
       delBtn.onclick = (e) => {
         e.stopPropagation()
@@ -849,7 +907,7 @@
 
   async function selectSession(sessionId) {
     if (state.isGenerating) {
-      if (!confirm('A response is currently generating. Switch chats anyway?')) return
+      if (!confirm('A response is currently generating. Switch duels anyway?')) return
       stopGeneration()
     }
 
@@ -895,7 +953,7 @@
           systemPrompt: state.systemPrompt || undefined,
         }),
       })
-      if (!res.ok) throw new Error('Failed to create chat')
+      if (!res.ok) throw new Error('Failed to create duel')
       const session = await res.json()
       state.currentSessionId = session.id
       state.currentSession = session
@@ -1386,25 +1444,63 @@
 
   // ── Event Listeners ──
   function initEventListeners() {
-    // Nav view switching (Chat vs Colosseum Arena)
+    // Nav view switching
     el.tabChat?.addEventListener('click', () => switchView('chat'))
     el.tabArena?.addEventListener('click', () => switchView('arena'))
 
-    // Colosseum Tournament Presets
+    // Stepper navigation clicks
+    el.stepNav1?.addEventListener('click', () => goToTournamentStep(1))
+    el.stepNav2?.addEventListener('click', () => {
+      if (state.selectedGladiators.length < 2) {
+        alert('Please select at least 2 gladiators first.')
+        return
+      }
+      goToTournamentStep(2)
+    })
+    el.stepNav3?.addEventListener('click', () => {
+      if (!state.currentTournament && !state.isTournamentRunning) {
+        alert('Please launch a tournament first.')
+        return
+      }
+      goToTournamentStep(3)
+    })
+    el.stepNav4?.addEventListener('click', () => {
+      if (!state.currentTournament) {
+        alert('No tournament results yet.')
+        return
+      }
+      goToTournamentStep(4)
+    })
+
+    // Stepper buttons
+    el.btnGotoTrials?.addEventListener('click', () => {
+      if (state.selectedGladiators.length < 2) {
+        alert('Please select at least 2 gladiators first.')
+        return
+      }
+      goToTournamentStep(2)
+    })
+
+    el.btnBacktoGladiators?.addEventListener('click', () => goToTournamentStep(1))
+    el.btnLaunchColosseum?.addEventListener('click', startColosseumTournament)
+    el.btnRestartTournament?.addEventListener('click', () => goToTournamentStep(1))
+
+    // Tournament Presets
     el.btnPresetAllOllama?.addEventListener('click', () => applyTournamentPreset('all-ollama'))
     el.btnPresetLocalCloud?.addEventListener('click', () => applyTournamentPreset('local-cloud'))
     el.btnPresetFastest?.addEventListener('click', () => applyTournamentPreset('fastest'))
 
-    // Launch tournament
-    el.btnLaunchColosseum?.addEventListener('click', startColosseumTournament)
-
-    // Request AI Judge for tournament
+    // AI Judge
     el.btnRequestJudge?.addEventListener('click', requestTournamentJudge)
 
-    // New Tournament sidebar button
+    // Sidebar buttons
+    el.btnNewChat?.addEventListener('click', () => {
+      switchView('chat')
+      createNewChat()
+    })
     el.btnNewTournament?.addEventListener('click', () => {
-      if (el.tournamentResultsContainer) el.tournamentResultsContainer.style.display = 'none'
-      if (el.tournamentSetupCard) el.tournamentSetupCard.scrollIntoView({ behavior: 'smooth' })
+      switchView('arena')
+      goToTournamentStep(1)
     })
 
     // Theme toggle
@@ -1442,14 +1538,6 @@
         el.refreshModelsBtn.style.transform = 'rotate(180deg)'
         await loadModels(true)
         setTimeout(() => { el.refreshModelsBtn.style.transform = 'none' }, 400)
-      }
-    }
-
-    // New chat button
-    if (el.newChatBtn) {
-      el.newChatBtn.onclick = () => {
-        switchView('chat')
-        createNewChat()
       }
     }
 

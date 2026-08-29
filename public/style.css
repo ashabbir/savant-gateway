@@ -998,7 +998,7 @@ body {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
-   SAVANT COLOSSEUM ARENA & TOURNAMENT BENCHMARK STYLES
+   SAVANT ARENA STEPPED TOURNAMENT BENCHMARK STYLES
    ════════════════════════════════════════════════════════════════════════ */
 
 .view-panel {
@@ -1023,37 +1023,90 @@ body {
   letter-spacing: 0.5px;
 }
 
-.colosseum-hero-header {
-  padding: 24px 32px;
-  background: radial-gradient(circle at top right, rgba(210, 153, 34, 0.12), transparent 50%),
-              radial-gradient(circle at bottom left, rgba(163, 113, 247, 0.1), transparent 50%),
-              var(--bg-sidebar);
+/* ── Stepper Navigation Header ── */
+.tournament-stepper-header {
+  padding: 16px 28px;
+  background: var(--bg-sidebar);
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.tournament-stepper-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .colosseum-badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: #d29922;
-  margin-bottom: 6px;
 }
 
-.colosseum-title {
-  font-size: 22px;
-  font-weight: 700;
+.tournament-steps-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.step-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.step-nav-btn:hover {
   color: var(--text-primary);
-  margin-bottom: 6px;
-  letter-spacing: -0.3px;
+  border-color: var(--text-secondary);
 }
 
-.colosseum-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  max-width: 800px;
-  line-height: 1.5;
+.step-nav-btn.active {
+  background: rgba(210, 153, 34, 0.15);
+  border-color: #d29922;
+  color: #d29922;
+}
+
+.step-nav-btn.completed {
+  color: var(--accent-green);
+  border-color: rgba(63, 185, 80, 0.4);
+}
+
+.step-badge {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-surface-hover);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.step-nav-btn.active .step-badge {
+  background: #d29922;
+  color: #fff;
+}
+
+.step-nav-arrow {
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
 .colosseum-scroll-area {
@@ -1062,60 +1115,194 @@ body {
   padding: 24px 32px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
-/* ── Tournament Setup Wizard ── */
-.tournament-setup-card {
-  background: var(--bg-sidebar);
-  border: 1px solid var(--border-color);
+/* ── Screen Containers ── */
+.tournament-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+.screen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.screen-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.screen-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.screen-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* ── Dedicated Page 3: Live Battle Arena Screen ── */
+.battle-arena-hero {
+  background: radial-gradient(circle at top right, rgba(210, 153, 34, 0.12), transparent 50%),
+              var(--bg-sidebar);
+  border: 1px solid #d29922;
   border-radius: var(--radius-md);
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  box-shadow: var(--shadow-sm);
+  gap: 20px;
+  box-shadow: 0 4px 20px rgba(210, 153, 34, 0.15);
 }
 
-.setup-section {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.setup-section-header {
+.battle-arena-meta-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
-.step-num {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #d29922, #a371f7);
-  color: #ffffff;
+.battle-trial-info {
+  flex: 1;
+  min-width: 280px;
+}
+
+.meta-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-hover);
+  background: rgba(47, 129, 247, 0.12);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.meta-tag.gold {
+  color: #d29922;
+  background: rgba(210, 153, 34, 0.15);
+}
+
+.live-trial-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.live-trial-prompt {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid #d29922;
+}
+
+.battle-gladiator-info {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.live-gladiator-model {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.live-gladiator-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-green);
+}
+
+.battle-progress-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 14px;
+}
+
+/* ── Live Stream Box in Arena ── */
+.battle-live-stream-box {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.battle-live-stream-header {
+  padding: 12px 18px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 12px;
-  flex-shrink: 0;
-  margin-top: 2px;
+  justify-content: space-between;
 }
 
-.setup-section-title {
-  font-size: 15px;
+.stream-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.setup-section-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 2px;
+.stream-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+  animation: pulse-dot 1.2s infinite;
 }
 
+.stream-stats-pill {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d29922;
+  font-family: var(--font-mono);
+}
+
+.battle-live-stream-body {
+  padding: 20px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  min-height: 220px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* ── Presets & Checkboxes ── */
 .presets-bar {
   display: flex;
   align-items: center;
