@@ -306,7 +306,6 @@
                 <div class="battle-trial-info">
                   <div class="meta-tag" id="live-trial-category">Coding & Algorithms</div>
                   <h2 class="live-trial-title" id="live-trial-title">Trial 1: LRU Cache Implementation</h2>
-                  <div class="live-trial-prompt" id="live-trial-prompt">Implement an LRU Cache in Python with O(1) complexity.</div>
                 </div>
 
                 <div class="battle-gladiator-info">
@@ -321,9 +320,9 @@
                 <div class="battle-progress-header">
                   <div class="battle-live-indicator">
                     <span class="live-dot-pulse"></span>
-                    <span id="battle-step-text">Trial 1 of 4: Running Gladiator A...</span>
+                    <span id="battle-step-text">Step 1 of 8: Running Gladiator A...</span>
                   </div>
-                  <div class="battle-running-badge">⚡ Running 1 Model at a Time (Unthrottled Hardware Benchmark)</div>
+                  <div class="battle-running-badge">⚡ Running 1 Model at a Time (Unthrottled Benchmark)</div>
                 </div>
                 <div class="battle-progress-bar-bg">
                   <div class="battle-progress-bar-fill" id="battle-progress-bar-fill" style="width: 0%;"></div>
@@ -331,20 +330,53 @@
               </div>
             </div>
 
-            <!-- Live Streaming Output Box for Current Model -->
-            <div class="battle-live-stream-box">
-              <div class="battle-live-stream-header">
-                <div class="stream-header-title">
-                  <span class="stream-dot"></span>
-                  <span>Live Model Generation Output</span>
+            <!-- Live Battle Chat Conversation Flow -->
+            <div class="battle-conversation-container">
+              <!-- Turn 1: Trial Challenge Prompt -->
+              <div class="battle-chat-message challenge-msg">
+                <div class="battle-chat-header">
+                  <span class="battle-chat-badge challenge">📜 Trial Master Challenge</span>
+                  <span class="battle-chat-meta" id="live-chat-category">Trial Question</span>
                 </div>
-                <div class="stream-stats-pill" id="live-stream-stats">
-                  <span>⚡ Benchmarking throughput...</span>
+                <div class="battle-chat-bubble" id="live-chat-prompt">
+                  <!-- Prompt content -->
                 </div>
               </div>
 
-              <div class="battle-live-stream-body message-content" id="live-stream-content">
-                <span class="thinking-spinner"></span> Initializing model generation...
+              <!-- Turn 2: Live Gladiator Response Stream -->
+              <div class="battle-chat-message response-msg">
+                <div class="battle-chat-header">
+                  <span class="battle-chat-badge gladiator" id="live-chat-gladiator-tag">🤺 Gladiator A</span>
+                  <span class="stats-pill live" id="live-chat-stats-pill" style="display: none;">
+                    <span class="stats-icon">⚡</span><span id="live-chat-stats-text">Streaming...</span>
+                  </span>
+                </div>
+                <div class="battle-chat-bubble">
+                  <!-- Thinking Container -->
+                  <div class="thinking-container" id="live-chat-thinking-container" style="display: none;">
+                    <div class="thinking-header" id="live-chat-thinking-header">
+                      <span class="thinking-status">
+                        <span class="thinking-spinner"></span>
+                        <span id="live-chat-thinking-status">Thought Process</span>
+                      </span>
+                      <span style="font-size: 10px;">▼</span>
+                    </div>
+                    <div class="thinking-body" id="live-chat-thinking-body"></div>
+                  </div>
+
+                  <!-- Markdown Response Content -->
+                  <div class="message-content" id="live-chat-response-content">
+                    <span class="thinking-spinner"></span> Initializing model generation...
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Completed Battles Timeline in this Tournament -->
+            <div class="battle-timeline-card" id="battle-timeline-card" style="display: none;">
+              <h4 class="battle-timeline-title">⚔️ Completed Steps in this Battle</h4>
+              <div class="battle-timeline-list" id="battle-timeline-list">
+                <!-- Dynamically populated -->
               </div>
             </div>
           </div>

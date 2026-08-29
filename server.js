@@ -571,9 +571,11 @@ async function runTournamentSequentially(tournamentId) {
     for (let pIdx = 0; pIdx < tournament.participants.length; pIdx++) {
       const p = tournament.participants[pIdx]
       tournament.currentParticipantIndex = pIdx
-      tournamentStore.scheduleSave()
 
       const runId = randomUUID()
+      tournament.currentRunId = runId
+      tournamentStore.scheduleSave()
+
       const adapter = ADAPTERS[p.provider]
       const model = p.model || adapter?.defaultModel || ''
       const singleChain = [{ provider: p.provider, model }]
@@ -598,11 +600,14 @@ async function runTournamentSequentially(tournamentId) {
         stats: finishedRun?.result?.stats || null,
         error: finishedRun?.error || null,
       })
+      tournament.currentRunId = null
+      tournamentStore.scheduleSave()
     }
   }
 
   const finishedTourney = tournamentStore.getTournament(tournamentId)
   if (finishedTourney) {
+    finishedTourney.currentRunId = null
     finishedTourney.status = 'completed'
     tournamentStore.scheduleSave()
   }

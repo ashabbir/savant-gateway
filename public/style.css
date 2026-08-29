@@ -1249,57 +1249,129 @@ body {
   padding-top: 14px;
 }
 
-/* ── Live Stream Box in Arena ── */
-.battle-live-stream-box {
+/* ── Live Battle Chat Conversation Flow ── */
+.battle-conversation-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.battle-chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   background: var(--bg-sidebar);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  padding: 16px 20px;
 }
 
-.battle-live-stream-header {
-  padding: 12px 18px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-color);
+.battle-chat-message.challenge-msg {
+  border-left: 4px solid var(--accent-hover);
+  background: rgba(47, 129, 247, 0.04);
+}
+
+.battle-chat-message.response-msg {
+  border-left: 4px solid #d29922;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.battle-chat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
 }
 
-.stream-header-title {
+.battle-chat-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.battle-chat-badge.challenge {
+  background: rgba(47, 129, 247, 0.15);
+  color: var(--accent-hover);
+}
+
+.battle-chat-badge.gladiator {
+  background: rgba(210, 153, 34, 0.15);
+  color: #d29922;
+}
+
+.battle-chat-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.battle-chat-bubble {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+/* ── Completed Battles Timeline in Arena ── */
+.battle-timeline-card {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.battle-timeline-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.stream-dot {
-  width: 8px;
-  height: 8px;
+.battle-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.battle-timeline-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+}
+
+.battle-timeline-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.battle-timeline-step-badge {
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: var(--accent-green);
-  box-shadow: 0 0 8px var(--accent-green);
-  animation: pulse-dot 1.2s infinite;
+  background: rgba(63, 185, 80, 0.2);
+  color: var(--accent-green);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.stream-stats-pill {
-  font-size: 12px;
-  font-weight: 600;
-  color: #d29922;
+.battle-timeline-metrics {
   font-family: var(--font-mono);
-}
-
-.battle-live-stream-body {
-  padding: 20px;
-  font-size: 13.5px;
-  line-height: 1.6;
-  min-height: 220px;
-  max-height: 500px;
-  overflow-y: auto;
+  font-size: 12px;
+  color: #d29922;
+  font-weight: 600;
 }
 
 /* ── Presets & Checkboxes ── */

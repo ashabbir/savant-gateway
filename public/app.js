@@ -1,7 +1,7 @@
 /**
  * Savant Arena Application
  * 1. Solo Duel (Single Fighter testing with live TPS & thinking process)
- * 2. Grand Tournament (Multi-step flow: Select Gladiators -> Select Trials -> Live Battle Arena -> Leaderboard & Graphs)
+ * 2. Grand Tournament (Multi-step flow: Select Gladiators -> Select Trials -> Live Real-Time Battle Arena -> Leaderboard & Graphs)
  */
 
 (function () {
@@ -107,17 +107,28 @@
     btnBacktoGladiators: document.getElementById('btn-backto-gladiators'),
     btnLaunchColosseum: document.getElementById('btn-launch-colosseum'),
 
-    // Step 3: Live Battle Arena Screen
+    // Step 3: Live Battle Arena Screen & Real-time Chat Stream
     liveTrialCategory: document.getElementById('live-trial-category'),
     liveTrialTitle: document.getElementById('live-trial-title'),
-    liveTrialPrompt: document.getElementById('live-trial-prompt'),
     liveGladiatorName: document.getElementById('live-gladiator-name'),
     liveGladiatorModel: document.getElementById('live-gladiator-model'),
     liveGladiatorTier: document.getElementById('live-gladiator-tier'),
     battleStepText: document.getElementById('battle-step-text'),
     battleProgressBarFill: document.getElementById('battle-progress-bar-fill'),
-    liveStreamStats: document.getElementById('live-stream-stats'),
-    liveStreamContent: document.getElementById('live-stream-content'),
+
+    liveChatPrompt: document.getElementById('live-chat-prompt'),
+    liveChatCategory: document.getElementById('live-chat-category'),
+    liveChatGladiatorTag: document.getElementById('live-chat-gladiator-tag'),
+    liveChatStatsPill: document.getElementById('live-chat-stats-pill'),
+    liveChatStatsText: document.getElementById('live-chat-stats-text'),
+    liveChatThinkingContainer: document.getElementById('live-chat-thinking-container'),
+    liveChatThinkingHeader: document.getElementById('live-chat-thinking-header'),
+    liveChatThinkingStatus: document.getElementById('live-chat-thinking-status'),
+    liveChatThinkingBody: document.getElementById('live-chat-thinking-body'),
+    liveChatResponseContent: document.getElementById('live-chat-response-content'),
+
+    battleTimelineCard: document.getElementById('battle-timeline-card'),
+    battleTimelineList: document.getElementById('battle-timeline-list'),
 
     // Step 4: Results & Leaderboard
     championBanner: document.getElementById('champion-banner'),
@@ -482,12 +493,13 @@
 
     if (state.isTournamentRunning) return
     state.isTournamentRunning = true
+    state.currentActiveBattleRunId = null
 
     // Switch to Dedicated Page 3: Live Battle Arena Screen!
     goToTournamentStep(3)
 
-    if (el.liveStreamContent) {
-      el.liveStreamContent.innerHTML = '<span class="thinking-spinner"></span> Initializing Colosseum battle sequence...'
+    if (el.liveChatResponseContent) {
+      el.liveChatResponseContent.innerHTML = '<span class="thinking-spinner"></span> Initializing Colosseum battle sequence...'
     }
 
     try {
@@ -539,24 +551,26 @@
         if (curQ && curP) {
           if (el.liveTrialCategory) el.liveTrialCategory.textContent = curQ.category
           if (el.liveTrialTitle) el.liveTrialTitle.textContent = `Trial ${tournament.currentQuestionIndex + 1}: ${curQ.title}`
-          if (el.liveTrialPrompt) el.liveTrialPrompt.textContent = curQ.prompt
+          if (el.liveChatPrompt) el.liveChatPrompt.innerHTML = window.SavantMarkdown.render(curQ.prompt)
+          if (el.liveChatCategory) el.liveChatCategory.textContent = `${curQ.category} (Trial ${tournament.currentQuestionIndex + 1})`
 
           if (el.liveGladiatorName) el.liveGladiatorName.textContent = curP.gladiatorName
           if (el.liveGladiatorModel) el.liveGladiatorModel.textContent = `${curP.provider}: ${curP.model}`
           if (el.liveGladiatorTier) el.liveGladiatorTier.textContent = curP.isLocal ? 'Free (Local Host)' : 'Cloud API'
+          if (el.liveChatGladiatorTag) el.liveChatGladiatorTag.textContent = `🤺 ${curP.gladiatorName} (${curP.model})`
 
           if (el.battleStepText) {
             el.battleStepText.textContent = `Step ${tournament.completedSteps + 1} of ${tournament.totalSteps}: Fighting ${curP.gladiatorName} (${curP.model})... [${pct}%]`
           }
 
-          // Inspect run response if completed
-          const activeRun = curQ.runs[curP.gladiatorKey]
-          if (activeRun && activeRun.response && el.liveStreamContent) {
-            el.liveStreamContent.innerHTML = window.SavantMarkdown.render(activeRun.response)
-            if (activeRun.benchmark && el.liveStreamStats) {
-              el.liveStreamStats.innerHTML = `⚡ ${activeRun.benchmark.tokensPerSecond} tok/s · TTFT: ${(activeRun.benchmark.firstTokenMs / 1000).toFixed(2)}s · ${activeRun.benchmark.totalSec}s`
-            }
+          // If there is an active runId, attach SSE live stream!
+          if (tournament.currentRunId && tournament.currentRunId !== state.currentActiveBattleRunId) {
+            state.currentActiveBattleRunId = tournament.currentRunId
+            attachBattleLiveStream(tournament.currentRunId, curQ, curP)
           }
+
+          // Render completed timeline
+          renderBattleTimeline(tournament)
         }
 
         // Check if tournament finished
@@ -564,6 +578,10 @@
           clearInterval(state.tournamentPollTimer)
           state.tournamentPollTimer = null
           state.isTournamentRunning = false
+          if (state.activeBattleEventSource) {
+            state.activeBattleEventSource.close()
+            state.activeBattleEventSource = null
+          }
 
           // Switch to Dedicated Page 4: Grand Leaderboard & Results!
           goToTournamentStep(4)
@@ -573,7 +591,142 @@
       } catch (err) {
         console.error('[gateway] poll tournament error:', err)
       }
-    }, 1500)
+    }, 800)
+  }
+
+  function attachBattleLiveStream(runId, curQ, curP) {
+    if (state.activeBattleEventSource) {
+      state.activeBattleEventSource.close()
+      state.activeBattleEventSource = null
+    }
+
+    if (el.liveChatResponseContent) {
+      el.liveChatResponseContent.innerHTML = '<span class="thinking-spinner"></span> <span class="streaming-cursor"></span>'
+    }
+    if (el.liveChatThinkingContainer) el.liveChatThinkingContainer.style.display = 'none'
+    if (el.liveChatThinkingBody) el.liveChatThinkingBody.textContent = ''
+    if (el.liveChatStatsPill) {
+      el.liveChatStatsPill.style.display = 'inline-flex'
+      if (el.liveChatStatsText) el.liveChatStatsText.textContent = 'Streaming live tokens...'
+    }
+
+    const es = new EventSource(`/runs/${runId}/stream`)
+    state.activeBattleEventSource = es
+
+    let streamStartTime = performance.now()
+    let accumulated = ''
+    let accumulatedThinking = ''
+
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'thinking') {
+          if (el.liveChatThinkingContainer) {
+            el.liveChatThinkingContainer.style.display = 'block'
+            if (data.tag && el.liveChatThinkingStatus) {
+              el.liveChatThinkingStatus.textContent = `${data.tag} (${data.status})`
+            }
+          }
+        } else if (data.type === 'chunk') {
+          accumulated += data.content
+          const tokens = Math.max(1, Math.round(accumulated.length / 3.8))
+          const elapsedSec = Math.max((performance.now() - streamStartTime) / 1000, 0.05)
+          const liveTPS = (tokens / elapsedSec).toFixed(1)
+
+          if (el.liveChatStatsText) {
+            el.liveChatStatsText.textContent = `${liveTPS} tok/s · ${tokens} tok · ${elapsedSec.toFixed(1)}s`
+          }
+
+          const parsed = parseClientThinking(accumulated)
+          if (parsed.thinking) {
+            accumulatedThinking = parsed.thinking
+            if (el.liveChatThinkingContainer && el.liveChatThinkingBody) {
+              el.liveChatThinkingContainer.style.display = 'block'
+              el.liveChatThinkingBody.textContent = accumulatedThinking
+            }
+          }
+
+          const answerText = parsed.answer || accumulated
+          if (el.liveChatResponseContent) {
+            el.liveChatResponseContent.innerHTML = window.SavantMarkdown.render(answerText) + '<span class="streaming-cursor"></span>'
+          }
+        } else if (data.type === 'complete') {
+          es.close()
+          state.activeBattleEventSource = null
+
+          const parsed = parseClientThinking(data.content || accumulated)
+          if (parsed.thinking && el.liveChatThinkingContainer && el.liveChatThinkingBody) {
+            el.liveChatThinkingContainer.style.display = 'block'
+            el.liveChatThinkingBody.textContent = parsed.thinking
+            if (el.liveChatThinkingStatus) el.liveChatThinkingStatus.textContent = 'Thought Process'
+          }
+
+          const finalAnswer = parsed.answer || data.content || accumulated
+          if (el.liveChatResponseContent) {
+            el.liveChatResponseContent.innerHTML = window.SavantMarkdown.render(finalAnswer)
+          }
+
+          if (el.liveChatStatsText && data.stats) {
+            el.liveChatStatsText.textContent = `${data.stats.tokensPerSecond} tok/s · ${data.stats.tokenCount} tok · ${(data.stats.totalTimeMs / 1000).toFixed(1)}s`
+          }
+        } else if (data.type === 'error') {
+          es.close()
+          state.activeBattleEventSource = null
+          if (el.liveChatResponseContent) {
+            el.liveChatResponseContent.innerHTML = `<div style="color: var(--accent-red);">Error: ${window.SavantMarkdown.escapeHtml(data.message || 'Trial failed')}</div>`
+          }
+        }
+      } catch (err) {
+        console.error('[gateway] battle stream parse error:', err)
+      }
+    }
+
+    es.onerror = () => {
+      es.close()
+      state.activeBattleEventSource = null
+    }
+  }
+
+  function renderBattleTimeline(t) {
+    if (!el.battleTimelineCard || !el.battleTimelineList) return
+    const completedRuns = []
+
+    t.questions.forEach((q, qIdx) => {
+      t.participants.forEach((p) => {
+        const run = q.runs[p.gladiatorKey]
+        if (run && run.status === 'complete' && run.response) {
+          completedRuns.push({
+            trialNum: qIdx + 1,
+            trialTitle: q.title,
+            gladiator: p.gladiatorName,
+            model: p.model,
+            tps: run.benchmark ? `${run.benchmark.tokensPerSecond} tok/s` : '--',
+            ttft: run.benchmark ? `${(run.benchmark.firstTokenMs / 1000).toFixed(2)}s` : '--',
+          })
+        }
+      })
+    })
+
+    if (completedRuns.length === 0) {
+      el.battleTimelineCard.style.display = 'none'
+      return
+    }
+
+    el.battleTimelineCard.style.display = 'flex'
+    el.battleTimelineList.innerHTML = ''
+
+    completedRuns.slice(-4).reverse().forEach((cr) => {
+      const item = document.createElement('div')
+      item.className = 'battle-timeline-item'
+      item.innerHTML = `
+        <div class="battle-timeline-left">
+          <span class="battle-timeline-step-badge">✓</span>
+          <span><strong>Trial ${cr.trialNum} (${window.SavantMarkdown.escapeHtml(cr.trialTitle)}):</strong> ${window.SavantMarkdown.escapeHtml(cr.gladiator)} (<code>${window.SavantMarkdown.escapeHtml(cr.model)}</code>)</span>
+        </div>
+        <div class="battle-timeline-metrics">⚡ ${cr.tps} · TTFT ${cr.ttft}</div>
+      `
+      el.battleTimelineList.appendChild(item)
+    })
   }
 
   // ── Render Leaderboard & Visual Performance Graphs (Page 4) ──
