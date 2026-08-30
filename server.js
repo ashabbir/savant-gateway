@@ -58,7 +58,7 @@ const tournamentStore = new TournamentStore()
 
 // ── POST /runs ────────────────────────────────────────────────────────────────
 app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
-  let { prompt, cwd, session_id, execution } = req.body || {}
+  let { prompt, cwd, session_id, execution, system } = req.body || {}
 
   // Handle messages array if provided instead of raw prompt
   if ((!prompt || typeof prompt !== 'string') && Array.isArray(req.body?.messages)) {
@@ -100,6 +100,7 @@ app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
     concurrency: req.body?.concurrency || process.env.GATEWAY_RACE_CONCURRENCY || 2,
     staggerMs: requestedStagger,
     cwd: runCwd,
+    system: typeof system === 'string' && system ? system : undefined,
   })
   runs.set(id, run)
 

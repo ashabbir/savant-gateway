@@ -172,6 +172,7 @@ const ADAPTERS = {
     label: 'Claude',
     baseArgv: ['claude', '-p', '--dangerously-skip-permissions'],
     modelArgv: (model) => (model ? ['--model', model] : []),
+    systemArgv: (system) => ['--system-prompt', system],
     promptArgv: (prompt) => [prompt],
     defaultModel: 'haiku',
     availableModels: [
@@ -180,7 +181,10 @@ const ADAPTERS = {
       'opus',
       'claude-haiku-4-5-20251001',
       'claude-sonnet-4-6',
+      'claude-sonnet-5',
       'claude-opus-4-7',
+      'claude-opus-4-8',
+      'claude-fable-5',
     ],
   },
   copilot: {
@@ -193,7 +197,10 @@ const ADAPTERS = {
     availableModels: [
       'claude-haiku-4.5',
       'claude-sonnet-4.6',
+      'claude-sonnet-5',
       'claude-opus-4.7',
+      'claude-opus-4.8',
+      'claude-fable-5',
       'gpt-4.1',
       'gpt-5-mini',
     ],
@@ -245,7 +252,9 @@ const ADAPTERS = {
       'Gemini 3.1 Pro (Low)',
       'Gemini 3.1 Pro (High)',
       'Claude Sonnet 4.6 (Thinking)',
+      'Claude Sonnet 5 (Thinking)',
       'Claude Opus 4.6 (Thinking)',
+      'Claude Opus 4.8 (Thinking)',
       'GPT-OSS 120B (Medium)',
     ],
   },
@@ -354,16 +363,19 @@ const DEFAULT_CHAIN = [
  * Builds array of command line arguments for spawning an agent.
  * @param {Object} step
  * @param {string} prompt
+ * @param {string} [system]
  * @returns {Array<string>}
  */
-function buildArgv(step, prompt) {
+function buildArgv(step, prompt, system) {
   if (!step || !step.provider) throw new Error('Invalid chain step')
   const adapter = ADAPTERS[step.provider]
   if (!adapter) throw new Error(`Unknown provider: ${step.provider}`)
   const model = resolveModel(adapter, step.model)
+  const systemArgv = system && adapter.systemArgv ? adapter.systemArgv(system) : []
   return [
     ...adapter.baseArgv,
     ...adapter.modelArgv(model),
+    ...systemArgv,
     ...adapter.promptArgv(prompt),
   ]
 }
