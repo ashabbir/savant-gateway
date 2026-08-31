@@ -2,11 +2,12 @@ const express = require('express')
 const path = require('path')
 const { randomUUID } = require('crypto')
 const { version } = require('./package.json')
-const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh } = require('./adapters')
+const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh, refreshAllModels } = require('./adapters')
 const { upload, buildPromptWithFiles, cleanupFiles, MAX_FILES, MAX_FILE_BYTES } = require('./uploads')
 const { SessionStore, formatChatPrompt } = require('./sessions')
 const { ComparisonStore, buildJudgePrompt } = require('./comparisons')
-const { TournamentStore, BENCHMARK_QUESTION_SUITES } = require('./tournaments')
+const { TournamentStore, BENCHMARK_QUESTION_SUITES, buildPeerReviewPrompt, buildFrontierJudgePrompt, extractPeerScore } = require('./tournaments')
+const { validateTrialResponse } = require('./code-validator')
 const {
   createRun,
   finalizeRun,
@@ -340,8 +341,9 @@ app.post('/sessions/:id/messages', upload.array('files', MAX_FILES), (req, res) 
 })
 
 // ── GET /models ──────────────────────────────────────────────────────────────
-app.get('/models', (_req, res) => {
-  scheduleModelRefresh()
+app.get(['/models', '/api/models', '/providers', '/api/providers'], (req, res) => {
+  const force = req.query.refresh === 'true' || req.query.refresh === '1'
+  scheduleModelRefresh(force)
   const providers = Object.keys(ADAPTERS).map((id) => {
     const adapter = ADAPTERS[id]
     return {
@@ -611,6 +613,75 @@ async function runTournamentSequentially(tournamentId) {
     finishedTourney.currentRunId = null
     finishedTourney.status = 'completed'
     tournamentStore.scheduleSave()
+
+    // Automatically run cross-gladiator peer reviews upon tournament completion
+    runPeerReviewsSequentially(tournamentId)
+  }
+}
+
+/**
+ * Executes cross-gladiator peer reviews sequentially: each gladiator critiques other gladiators' responses.
+ */
+async function runPeerReviewsSequentially(tournamentId) {
+  const tournament = tournamentStore.getTournament(tournamentId)
+  if (!tournament || !Array.isArray(tournament.participants) || tournament.participants.length < 2) return
+
+  for (let qIdx = 0; qIdx < tournament.questions.length; qIdx++) {
+    const q = tournament.questions[qIdx]
+
+    for (let rIdx = 0; rIdx < tournament.participants.length; rIdx++) {
+      const reviewer = tournament.participants[rIdx]
+
+      for (let tIdx = 0; tIdx < tournament.participants.length; tIdx++) {
+        if (rIdx === tIdx) continue
+        const target = tournament.participants[tIdx]
+        const targetRun = q.runs[target.gladiatorKey]
+        if (!targetRun || !targetRun.response) continue
+
+        // Check if review already exists
+        const existing = (q.peerReviews || []).find(
+          (r) => r.reviewerKey === reviewer.gladiatorKey && r.targetKey === target.gladiatorKey
+        )
+        if (existing && existing.review) continue
+
+        const prompt = buildPeerReviewPrompt({
+          question: q,
+          reviewer,
+          target,
+          targetResponse: targetRun.response,
+          targetValidation: targetRun.validation,
+        })
+
+        const adapter = ADAPTERS[reviewer.provider]
+        const model = reviewer.model || adapter?.defaultModel || ''
+        const runId = randomUUID()
+        const run = createRun({
+          id: runId,
+          session_id: `review:${tournament.id}:${q.id}:${reviewer.gladiatorKey}->${target.gladiatorKey}`,
+          prompt,
+          chain: [{ provider: reviewer.provider, model }],
+          execution: 'serial',
+        })
+        runs.set(runId, run)
+
+        await executeRun(run, runs, cleanupFiles, null)
+
+        const finishedRun = runs.get(runId)
+        const reviewText = finishedRun?.result?.response || ''
+        const score = extractPeerScore(reviewText)
+
+        tournamentStore.recordPeerReview(tournament.id, qIdx, {
+          reviewerKey: reviewer.gladiatorKey,
+          reviewerName: reviewer.gladiatorName,
+          reviewerModel: reviewer.model,
+          targetKey: target.gladiatorKey,
+          targetName: target.gladiatorName,
+          targetModel: target.model,
+          review: reviewText,
+          score,
+        })
+      }
+    }
   }
 }
 
@@ -666,40 +737,52 @@ app.get('/tournaments/:id', (req, res) => {
   res.json(tournament)
 })
 
+function getBestFrontierJudge(reqProvider, reqModel) {
+  if (reqProvider && PROVIDER_NAMES.includes(reqProvider)) {
+    const adapter = ADAPTERS[reqProvider]
+    return {
+      provider: reqProvider,
+      model: reqModel || adapter?.defaultModel || '',
+    }
+  }
+
+  // Frontier priority list
+  const priorityList = [
+    { provider: 'gemini', preferredModel: 'gemini-2.5-pro' },
+    { provider: 'gemini', preferredModel: 'gemini-2.5-flash' },
+    { provider: 'claude', preferredModel: 'sonnet' },
+    { provider: 'claude', preferredModel: 'haiku' },
+    { provider: 'codex', preferredModel: 'fast' },
+    { provider: 'agy', preferredModel: 'fast' },
+    { provider: 'hermes', preferredModel: 'configured' },
+    { provider: 'ollama', preferredModel: ADAPTERS.ollama?.defaultModel },
+  ]
+
+  for (const item of priorityList) {
+    if (PROVIDER_NAMES.includes(item.provider)) {
+      const adapter = ADAPTERS[item.provider]
+      const model = (adapter?.availableModels || []).includes(item.preferredModel)
+        ? item.preferredModel
+        : (adapter?.defaultModel || item.preferredModel || '')
+      return { provider: item.provider, model }
+    }
+  }
+
+  const fallbackProvider = PROVIDER_NAMES[0] || 'gemini'
+  const fallbackAdapter = ADAPTERS[fallbackProvider]
+  return {
+    provider: fallbackProvider,
+    model: fallbackAdapter?.defaultModel || '',
+  }
+}
+
 // ── POST /tournaments/:id/judge ───────────────────────────────────────────────
 app.post('/tournaments/:id/judge', (req, res) => {
   const tournament = tournamentStore.getTournament(req.params.id)
   if (!tournament) return res.status(404).json({ error: 'tournament not found' })
 
-  // Build composite evaluation prompt across all questions
-  const promptSections = [
-    '# Colosseum Tournament AI Judge Evaluation',
-    `Tournament: ${tournament.title}`,
-    'Evaluate the performance of all participating gladiators across all benchmark trials.\n',
-  ]
-
-  tournament.questions.forEach((q, qIdx) => {
-    promptSections.push(`## Trial ${qIdx + 1}: ${q.title} (${q.category})`)
-    promptSections.push(`Prompt: "${q.prompt}"\n`)
-
-    for (const p of tournament.participants) {
-      const run = q.runs[p.gladiatorKey]
-      const answer = run ? (run.response || '(No response)') : '(Not completed)'
-      promptSections.push(`### ${p.gladiatorName} (${p.gladiatorKey})\n"""\n${answer.slice(0, 1000)}\n"""\n`)
-    }
-  })
-
-  promptSections.push(`
-## Instructions:
-1. Provide a concise trial-by-trial evaluation.
-2. Score each gladiator on a 1-10 scale for Accuracy, Logic, and Speed.
-3. Crown the definitive Tournament Champion with clear rationale.
-`)
-
-  const judgePrompt = promptSections.join('\n')
-  const judgeProvider = req.body?.provider || (PROVIDER_NAMES.includes('gemini') ? 'gemini' : (PROVIDER_NAMES.includes('ollama') ? 'ollama' : PROVIDER_NAMES[0]))
-  const adapter = ADAPTERS[judgeProvider]
-  const judgeModel = req.body?.model || adapter?.defaultModel || ''
+  const { provider: judgeProvider, model: judgeModel } = getBestFrontierJudge(req.body?.provider, req.body?.model)
+  const judgePrompt = buildFrontierJudgePrompt(tournament, { judgeProvider, judgeModel })
 
   const runId = randomUUID()
   const run = createRun({
@@ -739,9 +822,66 @@ app.delete('/tournaments/:id', (req, res) => {
   res.json({ ok: true })
 })
 
-// ── GET /health ───────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  scheduleModelRefresh()
+// ── POST /tournaments/:id/peer-reviews ────────────────────────────────────────
+app.post('/tournaments/:id/peer-reviews', (req, res) => {
+  const tournament = tournamentStore.getTournament(req.params.id)
+  if (!tournament) return res.status(404).json({ error: 'tournament not found' })
+
+  // Trigger sequential peer review execution in background
+  runPeerReviewsSequentially(tournament.id)
+
+  res.status(202).json({
+    tournamentId: tournament.id,
+    status: 'running',
+    message: 'Gladiator peer reviews in progress',
+  })
+})
+
+// ── GET /tournaments/:id/peer-reviews ─────────────────────────────────────────
+app.get('/tournaments/:id/peer-reviews', (req, res) => {
+  const tournament = tournamentStore.getTournament(req.params.id)
+  if (!tournament) return res.status(404).json({ error: 'tournament not found' })
+
+  const allReviews = []
+  tournament.questions.forEach((q, qIdx) => {
+    (q.peerReviews || []).forEach((pr) => {
+      allReviews.push({
+        trialIndex: qIdx,
+        trialTitle: q.title,
+        trialCategory: q.category,
+        ...pr,
+      })
+    })
+  })
+
+  res.json({
+    tournamentId: tournament.id,
+    reviews: allReviews,
+    peerReviewsCount: allReviews.length,
+  })
+})
+
+// ── POST /validate-code ───────────────────────────────────────────────────────
+app.post('/validate-code', (req, res) => {
+  const { code, language, functionName, testCases, customTestHarness } = req.body || {}
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({ error: 'code (string) is required' })
+  }
+
+  const result = validateTrialResponse(code, {
+    language: language || 'javascript',
+    functionName,
+    testCases,
+    customTestHarness,
+  })
+
+  res.json({ result: result || { status: 'passed', passedCount: 0, totalCount: 0, tests: [] } })
+})
+
+// ── GET /health & /status ───────────────────────────────────────────────────
+app.get(['/health', '/status', '/api/health', '/api/status'], (req, res) => {
+  const force = req.query.refresh === 'true' || req.query.refresh === '1'
+  scheduleModelRefresh(force)
   res.json({
     ok: true,
     service: 'savant-gateway',
@@ -751,10 +891,10 @@ app.get('/health', (_req, res) => {
       const adapter = ADAPTERS[providerName]
       return {
         id: providerName,
-        name: adapter.name,
-        label: adapter.label,
-        defaultModel: adapter.defaultModel,
-        models: adapter.availableModels,
+        name: adapter?.name || providerName,
+        label: adapter?.label || providerName,
+        defaultModel: adapter?.defaultModel || '',
+        models: adapter?.availableModels || [],
       }
     }),
     disabledProviders: DISABLED_PROVIDERS,

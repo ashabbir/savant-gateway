@@ -228,5 +228,29 @@ test('Chat and Session API Endpoints', async (t) => {
     assert.equal(getRes.status, 200)
     const getData = await getRes.json()
     assert.equal(getData.id, tourney.id)
+
+    // Trigger peer reviews endpoint
+    const peerRes = await fetch(`${baseUrl}/tournaments/${tourney.id}/peer-reviews`, { method: 'POST' })
+    assert.equal(peerRes.status, 202)
+
+    const peerGetRes = await fetch(`${baseUrl}/tournaments/${tourney.id}/peer-reviews`)
+    assert.equal(peerGetRes.status, 200)
+    const peerGetData = await peerGetRes.json()
+    assert.ok(Array.isArray(peerGetData.reviews))
+
+    // Test POST /validate-code
+    const valRes = await fetch(`${baseUrl}/validate-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: 'function twoSum(nums, target) { return [0, 1]; }',
+        functionName: 'twoSum',
+        testCases: [{ input: [[2, 7], 9], expected: [0, 1] }],
+      }),
+    })
+    assert.equal(valRes.status, 200)
+    const valData = await valRes.json()
+    assert.equal(valData.result.status, 'passed')
+    assert.equal(valData.result.passedCount, 1)
   })
 })

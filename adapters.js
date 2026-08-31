@@ -304,29 +304,10 @@ function refreshLocalModels() {
   }
   const ollamaModels = discoverOllamaModels()
   ADAPTERS.ollama.availableModels = ollamaModels
-  ADAPTERS.ollama.defaultModel = ollamaModels[0] || ''
+  if (!ADAPTERS.ollama.availableModels.includes(ADAPTERS.ollama.defaultModel)) {
+    ADAPTERS.ollama.defaultModel = ollamaModels[0] || ''
+  }
   return { codex: ADAPTERS.codex, agy: ADAPTERS.agy, ollama: ADAPTERS.ollama }
-}
-
-refreshHermesModels()
-refreshLocalModels()
-
-const MODEL_REFRESH_TTL_MS = Number(process.env.GATEWAY_MODEL_REFRESH_TTL_MS) || 60_000
-let lastModelRefresh = Date.now()
-let modelRefreshPending = false
-
-function scheduleModelRefresh(force = false) {
-  if (modelRefreshPending || (!force && Date.now() - lastModelRefresh < MODEL_REFRESH_TTL_MS)) return
-  modelRefreshPending = true
-  setImmediate(() => {
-    try {
-      refreshHermesModels()
-      refreshLocalModels()
-      lastModelRefresh = Date.now()
-    } finally {
-      modelRefreshPending = false
-    }
-  })
 }
 
 const ALL_PROVIDER_NAMES = ['claude', 'copilot', 'codex', 'gemini', 'agy', 'hermes', 'ollama']
@@ -358,6 +339,66 @@ const DEFAULT_CHAIN = [
   { provider: 'agy', model: 'fast' },
   { provider: 'ollama', model: ADAPTERS.ollama.defaultModel },
 ].filter((step) => PROVIDER_NAMES.includes(step.provider) && step.model)
+
+function refreshActiveProviders() {
+  const active = ALL_PROVIDER_NAMES.filter((providerName) => {
+    const adapter = ADAPTERS[providerName]
+    const cliCommand = adapter?.baseArgv?.[0]
+    return Boolean(cliCommand) && isCommandAvailable(cliCommand)
+  })
+
+  PROVIDER_NAMES.length = 0
+  PROVIDER_NAMES.push(...active)
+
+  const disabled = ALL_PROVIDER_NAMES.filter((providerName) => !active.includes(providerName))
+  DISABLED_PROVIDERS.length = 0
+  DISABLED_PROVIDERS.push(...disabled)
+
+  const newDefaultChain = [
+    { provider: 'codex', model: 'fast' },
+    { provider: 'hermes', model: ADAPTERS.hermes.defaultModel },
+    { provider: 'claude', model: 'haiku' },
+    { provider: 'copilot', model: 'claude-haiku-4.5' },
+    { provider: 'gemini', model: 'gemini-2.5-flash' },
+    { provider: 'agy', model: 'fast' },
+    { provider: 'ollama', model: ADAPTERS.ollama.defaultModel },
+  ].filter((step) => PROVIDER_NAMES.includes(step.provider) && step.model)
+
+  DEFAULT_CHAIN.length = 0
+  DEFAULT_CHAIN.push(...newDefaultChain)
+
+  return { PROVIDER_NAMES, DISABLED_PROVIDERS, DEFAULT_CHAIN }
+}
+
+function refreshAllModels() {
+  refreshActiveProviders()
+  refreshHermesModels()
+  refreshLocalModels()
+  lastModelRefresh = Date.now()
+  return {
+    adapters: ADAPTERS,
+    providers: PROVIDER_NAMES,
+    disabled: DISABLED_PROVIDERS,
+    defaultChain: DEFAULT_CHAIN,
+  }
+}
+
+refreshHermesModels()
+refreshLocalModels()
+
+const MODEL_REFRESH_TTL_MS = Number(process.env.GATEWAY_MODEL_REFRESH_TTL_MS) || 5_000
+let lastModelRefresh = Date.now()
+let modelRefreshPending = false
+
+function scheduleModelRefresh(force = false) {
+  if (modelRefreshPending || (!force && Date.now() - lastModelRefresh < MODEL_REFRESH_TTL_MS)) return
+  modelRefreshPending = true
+  try {
+    refreshAllModels()
+  } finally {
+    modelRefreshPending = false
+  }
+}
 
 /**
  * Builds array of command line arguments for spawning an agent.
@@ -395,6 +436,8 @@ module.exports = {
   discoverOllamaModels,
   parseOllamaModels,
   refreshLocalModels,
+  refreshActiveProviders,
+  refreshAllModels,
   scheduleModelRefresh,
   resolveModel,
 }

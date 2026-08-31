@@ -271,11 +271,14 @@
 
           <!-- ── PAGE 2: SELECT TRIALS (QUESTIONS) ── -->
           <div class="tournament-screen" id="screen-trials" style="display: none;">
-            <div class="screen-header">
+            <div class="screen-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
               <div>
                 <h2 class="screen-title">Step 2: Select Battle Trials (Benchmark Questions)</h2>
-                <p class="screen-desc">Choose trial suites to test models on coding, logic, speed, and analytical reasoning.</p>
+                <p class="screen-desc">Choose trial suites or create custom coding challenges with automated test case validation.</p>
               </div>
+              <button class="btn-chip gold" id="btn-open-custom-trial" type="button" style="padding: 8px 14px; font-weight: 600;">
+                ✨ + Custom Coding Challenge
+              </button>
             </div>
 
             <div class="suite-tabs" id="suite-tabs">
@@ -368,6 +371,15 @@
                   <div class="message-content" id="live-chat-response-content">
                     <span class="thinking-spinner"></span> Initializing model generation...
                   </div>
+
+                  <!-- Automated Code Validation Results Box -->
+                  <div class="battle-validation-box" id="live-chat-validation-box" style="display: none;">
+                    <div class="battle-val-header">
+                      <span class="battle-val-badge" id="live-chat-val-badge">🧪 Automated Code Tests</span>
+                      <span class="battle-val-stats" id="live-chat-val-stats">5/5 passed (100%)</span>
+                    </div>
+                    <div class="battle-val-tests-list" id="live-chat-val-tests-list"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -416,6 +428,28 @@
                   <!-- Rendered via HTML5 / SVG -->
                 </div>
               </div>
+
+              <!-- Code Validation Chart -->
+              <div class="chart-card" id="card-chart-validation">
+                <div class="chart-card-header">
+                  <h4 class="chart-title">🧪 Code Test Pass Rate (%)</h4>
+                  <span class="chart-subtitle">Higher is better (Automated Assertion Accuracy)</span>
+                </div>
+                <div class="chart-container" id="chart-validation-container">
+                  <!-- Rendered via HTML5 / SVG -->
+                </div>
+              </div>
+
+              <!-- Peer Score Chart -->
+              <div class="chart-card" id="card-chart-peerscore">
+                <div class="chart-card-header">
+                  <h4 class="chart-title">⭐ Gladiator Peer Review Ratings (/10)</h4>
+                  <span class="chart-subtitle">Average score awarded by opponent gladiators</span>
+                </div>
+                <div class="chart-container" id="chart-peerscore-container">
+                  <!-- Rendered via HTML5 / SVG -->
+                </div>
+              </div>
             </div>
 
             <!-- ── GRAND LEADERBOARD COMPARISON TABLE ── -->
@@ -423,7 +457,7 @@
               <div class="table-card-header">
                 <h3 class="table-card-title">🏆 Colosseum Tournament Leaderboard</h3>
                 <button class="btn-icon" id="btn-request-judge" type="button">
-                  <span>🤖 Request AI Judge Scoring</span>
+                  <span>🏛️ Request Frontier Arbiter Verdict</span>
                 </button>
               </div>
 
@@ -434,6 +468,8 @@
                       <th>Rank</th>
                       <th>Gladiator</th>
                       <th>Provider / Model</th>
+                      <th>Code Tests</th>
+                      <th>Peer Score</th>
                       <th>Avg Speed (TPS)</th>
                       <th>Avg TTFT</th>
                       <th>Avg Turnaround</th>
@@ -448,10 +484,45 @@
               </div>
             </div>
 
+            <!-- ── GLADIATOR PEER REVIEWS & CROSS-FEEDBACK SECTION ── -->
+            <div class="peer-reviews-card" id="peer-reviews-card">
+              <div class="table-card-header" style="flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <h3 class="table-card-title">🤺 Gladiator Cross-Reviews & Peer Feedback</h3>
+                  <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Gladiators review each other's code solutions, identify edge cases and flaws, and award peer ratings.</p>
+                </div>
+                <button class="btn-icon" id="btn-trigger-peer-reviews" type="button">
+                  <span>⚡ Run Gladiator Peer Reviews</span>
+                </button>
+              </div>
+
+              <div class="peer-reviews-body" id="peer-reviews-body">
+                <div class="peer-scores-leaderboard" id="peer-scores-leaderboard">
+                  <!-- Gladiator peer score cards -->
+                </div>
+
+                <div class="peer-filters-bar" id="peer-filters-bar" style="display: none;">
+                  <span class="control-label" style="font-size: 11px;">Filter:</span>
+                  <select class="form-input" id="filter-peer-reviewer" style="padding: 4px 8px; font-size: 12px; width: auto;">
+                    <option value="">All Reviewers</option>
+                  </select>
+                  <select class="form-input" id="filter-peer-target" style="padding: 4px 8px; font-size: 12px; width: auto;">
+                    <option value="">All Opponents</option>
+                  </select>
+                </div>
+
+                <div class="peer-reviews-grid" id="peer-reviews-grid">
+                  <div class="peer-reviews-empty" id="peer-reviews-empty">
+                    <span>⚔️ Click "Run Gladiator Peer Reviews" to have each AI gladiator review and score the opponent responses!</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- AI Judge Evaluation Card -->
             <div class="judge-verdict-card" id="colosseum-judge-card" style="display: none;">
               <div class="judge-verdict-header">
-                <div class="judge-badge">🤖 Colosseum AI Judge Tournament Verdict</div>
+                <div class="judge-badge">🏛️ Frontier AI Arbiter Domain Verdicts & Gladiator Comparison</div>
                 <div class="judge-meta" id="colosseum-judge-meta"></div>
               </div>
               <div class="judge-verdict-body message-content" id="colosseum-judge-body"></div>
@@ -459,7 +530,7 @@
 
             <!-- ── TRIAL-BY-TRIAL BATTLE LOG ── -->
             <div class="trials-breakdown-card">
-              <h3 class="table-card-title" style="margin-bottom: 12px;">📜 Trial-by-Trial Battle Responses</h3>
+              <h3 class="table-card-title" style="margin-bottom: 12px;">📜 Trial-by-Trial Battle Responses & Code Validation</h3>
               <div class="trials-accordion" id="trials-accordion">
                 <!-- Rendered dynamically for each question -->
               </div>
@@ -492,6 +563,64 @@
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
           <button class="btn-icon" id="btn-save-settings" type="button" style="background: var(--accent-primary); color: #fff; border: none; padding: 8px 16px;">Save</button>
+        </div>
+      </div>
+    <!-- Custom Coding Challenge Modal -->
+    <div class="modal-backdrop" id="custom-trial-modal" style="display: none;">
+      <div class="modal-content custom-trial-modal-content" style="max-width: 680px;">
+        <div class="modal-header">
+          <h3 class="modal-title">✨ Create Custom Coding Trial with Test Validation</h3>
+          <button class="modal-close" id="btn-close-custom-trial" type="button">&times;</button>
+        </div>
+        <div class="modal-scroll-body" style="max-height: 70vh; overflow-y: auto; padding-right: 4px;">
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="custom-trial-title">Challenge Title</label>
+              <input type="text" id="custom-trial-title" class="form-input" placeholder="e.g. Reverse Words in a String">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="custom-trial-category">Category</label>
+              <input type="text" id="custom-trial-category" class="form-input" value="Coding & Algorithms">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="custom-trial-language">Language</label>
+              <select id="custom-trial-language" class="form-input">
+                <option value="javascript">JavaScript (Node.js VM)</option>
+                <option value="python">Python 3</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="custom-trial-fn-name">Function Name</label>
+              <input type="text" id="custom-trial-fn-name" class="form-input" placeholder="e.g. reverseWords">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="custom-trial-signature">Signature</label>
+              <input type="text" id="custom-trial-signature" class="form-input" placeholder="e.g. function reverseWords(s)">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="custom-trial-prompt">Problem Description & Prompt for Gladiators</label>
+            <textarea id="custom-trial-prompt" class="form-textarea" rows="3" placeholder="e.g. Write a function reverseWords(s) that reverses the order of words in a string. Multiple spaces should be collapsed to a single space."></textarea>
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <label class="form-label" style="margin: 0;">🧪 Automated Test Cases (Input & Expected Output)</label>
+              <button class="btn-chip" id="btn-add-test-case-row" type="button" style="font-size: 11px; padding: 4px 10px;">+ Add Test Case</button>
+            </div>
+            <div class="test-cases-builder-list" id="test-cases-builder-list">
+              <!-- Dynamically populated test case rows -->
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+          <button class="btn-chip" id="btn-cancel-custom-trial" type="button">Cancel</button>
+          <button class="btn-launch-colosseum" id="btn-save-custom-trial" type="button" style="padding: 8px 18px; font-size: 13px;">Save & Add to Arena ➔</button>
         </div>
       </div>
     </div>

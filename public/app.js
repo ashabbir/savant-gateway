@@ -100,14 +100,27 @@
     btnPresetLocalCloud: document.getElementById('btn-preset-local-cloud'),
     btnPresetFastest: document.getElementById('btn-preset-fastest'),
 
-    // Step 2: Trials
+    // Step 2: Trials & Custom Coding Challenge
     suiteTabs: document.getElementById('suite-tabs'),
     questionsSelectionList: document.getElementById('questions-selection-list'),
     trialsSummaryCount: document.getElementById('trials-summary-count'),
     btnBacktoGladiators: document.getElementById('btn-backto-gladiators'),
     btnLaunchColosseum: document.getElementById('btn-launch-colosseum'),
+    btnOpenCustomTrial: document.getElementById('btn-open-custom-trial'),
+    customTrialModal: document.getElementById('custom-trial-modal'),
+    btnCloseCustomTrial: document.getElementById('btn-close-custom-trial'),
+    btnCancelCustomTrial: document.getElementById('btn-cancel-custom-trial'),
+    btnSaveCustomTrial: document.getElementById('btn-save-custom-trial'),
+    customTrialTitle: document.getElementById('custom-trial-title'),
+    customTrialCategory: document.getElementById('custom-trial-category'),
+    customTrialLanguage: document.getElementById('custom-trial-language'),
+    customTrialFnName: document.getElementById('custom-trial-fn-name'),
+    customTrialSignature: document.getElementById('custom-trial-signature'),
+    customTrialPrompt: document.getElementById('custom-trial-prompt'),
+    btnAddTestCaseRow: document.getElementById('btn-add-test-case-row'),
+    testCasesBuilderList: document.getElementById('test-cases-builder-list'),
 
-    // Step 3: Live Battle Arena Screen & Real-time Chat Stream
+    // Step 3: Live Battle Arena Screen & Real-time Chat Stream & Validation
     liveTrialCategory: document.getElementById('live-trial-category'),
     liveTrialTitle: document.getElementById('live-trial-title'),
     liveGladiatorName: document.getElementById('live-gladiator-name'),
@@ -126,21 +139,37 @@
     liveChatThinkingStatus: document.getElementById('live-chat-thinking-status'),
     liveChatThinkingBody: document.getElementById('live-chat-thinking-body'),
     liveChatResponseContent: document.getElementById('live-chat-response-content'),
+    liveChatValidationBox: document.getElementById('live-chat-validation-box'),
+    liveChatValBadge: document.getElementById('live-chat-val-badge'),
+    liveChatValStats: document.getElementById('live-chat-val-stats'),
+    liveChatValTestsList: document.getElementById('live-chat-val-tests-list'),
 
     battleTimelineCard: document.getElementById('battle-timeline-card'),
     battleTimelineList: document.getElementById('battle-timeline-list'),
 
-    // Step 4: Results & Leaderboard
+    // Step 4: Results & Leaderboard & Peer Reviews
     championBanner: document.getElementById('champion-banner'),
     championName: document.getElementById('champion-name'),
     championStats: document.getElementById('champion-stats'),
     chartSpeedContainer: document.getElementById('chart-speed-container'),
     chartLatencyContainer: document.getElementById('chart-latency-container'),
+    cardChartValidation: document.getElementById('card-chart-validation'),
+    chartValidationContainer: document.getElementById('chart-validation-container'),
+    cardChartPeerscore: document.getElementById('card-chart-peerscore'),
+    chartPeerscoreContainer: document.getElementById('chart-peerscore-container'),
     tournamentSummaryTbody: document.getElementById('tournament-summary-tbody'),
     btnRequestJudge: document.getElementById('btn-request-judge'),
     colosseumJudgeCard: document.getElementById('colosseum-judge-card'),
     colosseumJudgeMeta: document.getElementById('colosseum-judge-meta'),
     colosseumJudgeBody: document.getElementById('colosseum-judge-body'),
+    peerReviewsCard: document.getElementById('peer-reviews-card'),
+    btnTriggerPeerReviews: document.getElementById('btn-trigger-peer-reviews'),
+    peerScoresLeaderboard: document.getElementById('peer-scores-leaderboard'),
+    peerFiltersBar: document.getElementById('peer-filters-bar'),
+    filterPeerReviewer: document.getElementById('filter-peer-reviewer'),
+    filterPeerTarget: document.getElementById('filter-peer-target'),
+    peerReviewsGrid: document.getElementById('peer-reviews-grid'),
+    peerReviewsEmpty: document.getElementById('peer-reviews-empty'),
     trialsAccordion: document.getElementById('trials-accordion'),
     btnRestartTournament: document.getElementById('btn-restart-tournament'),
   }
@@ -171,6 +200,7 @@
     if (el.arenaSidebarSection) el.arenaSidebarSection.style.display = viewName === 'arena' ? 'block' : 'none'
 
     if (viewName === 'arena') {
+      loadModels(true)
       loadTournamentQuestions()
       loadTournaments()
       renderGladiatorCheckboxes()
@@ -203,7 +233,8 @@
   // ── Fetch Models & Providers ──
   async function loadModels(force = false) {
     try {
-      const res = await fetch('/models')
+      const url = force ? '/models?refresh=true' : '/models'
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to load models')
       const data = await res.json()
       state.providerDetails = data.providers || []
@@ -263,25 +294,32 @@
       return
     }
 
+    const validModels = []
     for (const m of provider.models) {
       const opt = document.createElement('option')
       const parts = String(m).split('\t')
-      opt.value = parts[0]
-      opt.textContent = parts[1] || parts[0]
-      if (parts[0] === provider.defaultModel) {
+      const modelVal = parts[0]
+      const modelLabel = parts[1] || parts[0]
+      validModels.push(modelVal)
+      opt.value = modelVal
+      opt.textContent = modelLabel
+      if (modelVal === provider.defaultModel) {
         opt.textContent += ' (default)'
       }
       el.modelSelect.appendChild(opt)
     }
 
     const prevModel = state.selectedModel
-    if (prevModel && provider.models.some((m) => String(m).startsWith(prevModel))) {
+    if (prevModel && validModels.includes(prevModel)) {
       el.modelSelect.value = prevModel
-    } else if (provider.defaultModel) {
+    } else if (provider.defaultModel && validModels.includes(provider.defaultModel)) {
       el.modelSelect.value = provider.defaultModel
       state.selectedModel = provider.defaultModel
+    } else if (validModels.length > 0) {
+      el.modelSelect.value = validModels[0]
+      state.selectedModel = validModels[0]
     } else {
-      state.selectedModel = el.modelSelect.value
+      state.selectedModel = ''
     }
   }
 
@@ -328,6 +366,11 @@
         })
       }
     }
+
+    // Retain only gladiators that still exist in the current discovery list
+    state.selectedGladiators = state.selectedGladiators.filter((sg) =>
+      allGladiators.some((ag) => ag.provider === sg.provider && ag.model === sg.model)
+    )
 
     if (state.selectedGladiators.length === 0 && allGladiators.length >= 2) {
       state.selectedGladiators = allGladiators.slice(0, 2)
@@ -407,10 +450,19 @@
     questions.forEach((q) => {
       const item = document.createElement('div')
       item.className = 'question-item'
+      const hasTests = Array.isArray(q.testCases) && q.testCases.length > 0
+      const testBadge = hasTests
+        ? `<span class="val-badge passed" style="font-size: 10px; margin-left: 6px;">🧪 ${q.testCases.length} Tests (${q.language || 'JS'})</span>`
+        : ''
+
       item.innerHTML = `
         <input type="checkbox" checked style="cursor: pointer; margin-top: 3px;">
         <div class="question-item-info">
-          <div class="question-item-title">${window.SavantMarkdown.escapeHtml(q.title)} <span style="font-size: 11px; color: var(--text-muted);">(${window.SavantMarkdown.escapeHtml(q.category)})</span></div>
+          <div class="question-item-title">
+            ${window.SavantMarkdown.escapeHtml(q.title)} 
+            <span style="font-size: 11px; color: var(--text-muted);">(${window.SavantMarkdown.escapeHtml(q.category)})</span>
+            ${testBadge}
+          </div>
           <div class="question-item-prompt">${window.SavantMarkdown.escapeHtml(q.prompt)}</div>
         </div>
       `
@@ -441,6 +493,124 @@
     if (el.trialsSummaryCount) {
       el.trialsSummaryCount.textContent = `${state.selectedQuestions.length} Trials selected`
     }
+  }
+
+  // ── Custom Coding Trial Builder ──
+  function openCustomTrialModal() {
+    if (!el.customTrialModal) return
+    if (el.customTrialTitle) el.customTrialTitle.value = ''
+    if (el.customTrialFnName) el.customTrialFnName.value = ''
+    if (el.customTrialSignature) el.customTrialSignature.value = ''
+    if (el.customTrialPrompt) el.customTrialPrompt.value = ''
+
+    if (el.testCasesBuilderList) {
+      el.testCasesBuilderList.innerHTML = ''
+      addTestCaseRow('Example 1', '[[2, 7, 11, 15], 9]', '[0, 1]')
+      addTestCaseRow('Edge Case', '[[3, 3], 6]', '[0, 1]')
+    }
+
+    el.customTrialModal.style.display = 'flex'
+  }
+
+  function closeCustomTrialModal() {
+    if (el.customTrialModal) el.customTrialModal.style.display = 'none'
+  }
+
+  function addTestCaseRow(name = '', inputStr = '', expectedStr = '') {
+    if (!el.testCasesBuilderList) return
+    const row = document.createElement('div')
+    row.className = 'test-case-builder-item'
+    row.innerHTML = `
+      <input type="text" class="form-input tc-name" placeholder="Test Name" value="${window.SavantMarkdown.escapeHtml(name)}">
+      <input type="text" class="form-input tc-input" placeholder="Input Args (JSON)" value="${window.SavantMarkdown.escapeHtml(inputStr)}">
+      <input type="text" class="form-input tc-expected" placeholder="Expected (JSON)" value="${window.SavantMarkdown.escapeHtml(expectedStr)}">
+      <button type="button" class="btn-delete-tc" title="Remove Test Case">&times;</button>
+    `
+
+    row.querySelector('.btn-delete-tc').onclick = () => row.remove()
+    el.testCasesBuilderList.appendChild(row)
+  }
+
+  function saveCustomTrial() {
+    const title = el.customTrialTitle?.value.trim()
+    const category = el.customTrialCategory?.value.trim() || 'Coding & Algorithms'
+    const language = el.customTrialLanguage?.value || 'javascript'
+    const functionName = el.customTrialFnName?.value.trim() || ''
+    const functionSignature = el.customTrialSignature?.value.trim() || ''
+    const prompt = el.customTrialPrompt?.value.trim()
+
+    if (!title || !prompt) {
+      alert('Please provide at least a title and problem prompt for the challenge.')
+      return
+    }
+
+    const testCases = []
+    const rows = el.testCasesBuilderList?.querySelectorAll('.test-case-builder-item') || []
+    for (const row of rows) {
+      const tcName = row.querySelector('.tc-name')?.value.trim() || `Test Case ${testCases.length + 1}`
+      const tcInputRaw = row.querySelector('.tc-input')?.value.trim() || '[]'
+      const tcExpectedRaw = row.querySelector('.tc-expected')?.value.trim() || 'null'
+
+      let parsedInput, parsedExpected
+      try {
+        parsedInput = JSON.parse(tcInputRaw)
+      } catch {
+        parsedInput = tcInputRaw
+      }
+      try {
+        parsedExpected = JSON.parse(tcExpectedRaw)
+      } catch {
+        parsedExpected = tcExpectedRaw
+      }
+
+      testCases.push({
+        name: tcName,
+        input: parsedInput,
+        expected: parsedExpected,
+      })
+    }
+
+    const customQuestion = {
+      id: `custom-trial-${Date.now()}`,
+      category,
+      title,
+      language,
+      functionName,
+      functionSignature,
+      prompt,
+      testCases,
+    }
+
+    // Add or update custom suite in state.benchmarkSuites
+    let customSuite = state.benchmarkSuites.find((s) => s.id === 'custom-suite')
+    if (!customSuite) {
+      customSuite = {
+        id: 'custom-suite',
+        name: '✨ Custom Challenges',
+        description: 'User-created trials with automated test case validation.',
+        questions: [],
+      }
+      state.benchmarkSuites.push(customSuite)
+    }
+
+    customSuite.questions.push(customQuestion)
+    if (!state.selectedQuestions.some((sq) => sq.id === customQuestion.id)) {
+      state.selectedQuestions.push(customQuestion)
+    }
+
+    closeCustomTrialModal()
+    renderSuiteTabs()
+    // Activate the custom suite tab
+    const customIdx = state.benchmarkSuites.findIndex((s) => s.id === 'custom-suite')
+    if (customIdx >= 0) {
+      const tabs = el.suiteTabs?.querySelectorAll('.suite-tab') || []
+      if (tabs[customIdx]) {
+        tabs.forEach((t) => t.classList.remove('active'))
+        tabs[customIdx].classList.add('active')
+        renderQuestionsList(customSuite.questions)
+      }
+    }
+    updateTrialsSummary()
   }
 
   // ── Arena Presets ──
@@ -563,6 +733,14 @@
             el.battleStepText.textContent = `Step ${tournament.completedSteps + 1} of ${tournament.totalSteps}: Fighting ${curP.gladiatorName} (${curP.model})... [${pct}%]`
           }
 
+          // Render live validation results if available for current run
+          const currentGladiatorRun = curQ.runs?.[curP.gladiatorKey]
+          if (currentGladiatorRun?.validation) {
+            renderLiveValidationBox(currentGladiatorRun.validation)
+          } else if (!state.isGenerating) {
+            if (el.liveChatValidationBox) el.liveChatValidationBox.style.display = 'none'
+          }
+
           // If there is an active runId, attach SSE live stream!
           if (tournament.currentRunId && tournament.currentRunId !== state.currentActiveBattleRunId) {
             state.currentActiveBattleRunId = tournament.currentRunId
@@ -587,11 +765,70 @@
           goToTournamentStep(4)
           renderTournamentResults(tournament)
           loadTournaments()
+          if (!tournament.aiJudgeVerdict && !state.activeJudgeEventSource) {
+            requestTournamentJudge()
+          }
         }
       } catch (err) {
         console.error('[gateway] poll tournament error:', err)
       }
     }, 800)
+  }
+
+  function renderLiveValidationBox(validation) {
+    if (!el.liveChatValidationBox) return
+    if (!validation) {
+      el.liveChatValidationBox.style.display = 'none'
+      return
+    }
+
+    el.liveChatValidationBox.style.display = 'block'
+    const isPassed = validation.status === 'passed'
+    const badgeClass = isPassed ? 'passed' : (validation.status === 'failed' ? 'failed' : 'error')
+    const badgeIcon = isPassed ? '✅' : (validation.status === 'failed' ? '❌' : '⚠️')
+
+    if (el.liveChatValBadge) {
+      el.liveChatValBadge.className = `val-badge ${badgeClass}`
+      el.liveChatValBadge.innerHTML = `${badgeIcon} ${validation.status.toUpperCase()}`
+    }
+
+    if (el.liveChatValStats) {
+      el.liveChatValStats.textContent = `${validation.passedCount}/${validation.totalCount} tests passed (${validation.passRate || 0}%) · ${validation.durationMs}ms`
+    }
+
+    if (el.liveChatValTestsList && Array.isArray(validation.tests)) {
+      if (validation.tests.length === 0) {
+        el.liveChatValTestsList.innerHTML = `<div style="padding: 10px; font-size: 12px; color: var(--text-muted);">${validation.error || 'No test cases executed.'}</div>`
+      } else {
+        let tableHtml = `
+          <table class="test-cases-table">
+            <thead>
+              <tr>
+                <th>Test Case</th>
+                <th>Input</th>
+                <th>Expected</th>
+                <th>Actual</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+        `
+        validation.tests.forEach((t) => {
+          const pass = t.passed
+          tableHtml += `
+            <tr>
+              <td><strong>${window.SavantMarkdown.escapeHtml(t.name)}</strong></td>
+              <td><code>${window.SavantMarkdown.escapeHtml(t.input || '')}</code></td>
+              <td><code>${window.SavantMarkdown.escapeHtml(t.expected || '')}</code></td>
+              <td><code>${window.SavantMarkdown.escapeHtml(t.actual || t.error || '')}</code></td>
+              <td><span class="${pass ? 'tc-status-pass' : 'tc-status-fail'}">${pass ? '✓ PASS' : '✗ FAIL'}</span></td>
+            </tr>
+          `
+        })
+        tableHtml += '</tbody></table>'
+        el.liveChatValTestsList.innerHTML = tableHtml
+      }
+    }
   }
 
   function attachBattleLiveStream(runId, curQ, curP) {
@@ -605,6 +842,7 @@
     }
     if (el.liveChatThinkingContainer) el.liveChatThinkingContainer.style.display = 'none'
     if (el.liveChatThinkingBody) el.liveChatThinkingBody.textContent = ''
+    if (el.liveChatValidationBox) el.liveChatValidationBox.style.display = 'none'
     if (el.liveChatStatsPill) {
       el.liveChatStatsPill.style.display = 'inline-flex'
       if (el.liveChatStatsText) el.liveChatStatsText.textContent = 'Streaming live tokens...'
@@ -669,6 +907,26 @@
           if (el.liveChatStatsText && data.stats) {
             el.liveChatStatsText.textContent = `${data.stats.tokensPerSecond} tok/s · ${data.stats.tokenCount} tok · ${(data.stats.totalTimeMs / 1000).toFixed(1)}s`
           }
+
+          // Live validation check if test cases configured
+          if (curQ && (curQ.testCases?.length > 0 || curQ.customTestHarness)) {
+            fetch('/validate-code', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: finalAnswer,
+                language: curQ.language,
+                functionName: curQ.functionName,
+                testCases: curQ.testCases,
+                customTestHarness: curQ.customTestHarness,
+              }),
+            })
+              .then((r) => r.json())
+              .then((vData) => {
+                if (vData.result) renderLiveValidationBox(vData.result)
+              })
+              .catch((e) => console.warn('[gateway] live validate error:', e))
+          }
         } else if (data.type === 'error') {
           es.close()
           state.activeBattleEventSource = null
@@ -695,6 +953,9 @@
       t.participants.forEach((p) => {
         const run = q.runs[p.gladiatorKey]
         if (run && run.status === 'complete' && run.response) {
+          const valBadge = run.validation
+            ? ` · 🧪 ${run.validation.passedCount}/${run.validation.totalCount} Tests (${run.validation.passRate}%)`
+            : ''
           completedRuns.push({
             trialNum: qIdx + 1,
             trialTitle: q.title,
@@ -702,6 +963,7 @@
             model: p.model,
             tps: run.benchmark ? `${run.benchmark.tokensPerSecond} tok/s` : '--',
             ttft: run.benchmark ? `${(run.benchmark.firstTokenMs / 1000).toFixed(2)}s` : '--',
+            valBadge,
           })
         }
       })
@@ -723,7 +985,7 @@
           <span class="battle-timeline-step-badge">✓</span>
           <span><strong>Trial ${cr.trialNum} (${window.SavantMarkdown.escapeHtml(cr.trialTitle)}):</strong> ${window.SavantMarkdown.escapeHtml(cr.gladiator)} (<code>${window.SavantMarkdown.escapeHtml(cr.model)}</code>)</span>
         </div>
-        <div class="battle-timeline-metrics">⚡ ${cr.tps} · TTFT ${cr.ttft}</div>
+        <div class="battle-timeline-metrics">⚡ ${cr.tps} · TTFT ${cr.ttft}${cr.valBadge}</div>
       `
       el.battleTimelineList.appendChild(item)
     })
@@ -735,15 +997,36 @@
     if (t.champion) {
       if (el.championBanner) el.championBanner.style.display = 'flex'
       if (el.championName) el.championName.textContent = `${t.champion.gladiatorName} (${t.champion.provider}:${t.champion.model})`
-      if (el.championStats) el.championStats.textContent = `⚡ Output Speed: ${t.champion.avgTps} tok/s · 💰 Cost Tier: ${t.champion.isLocal ? 'Free (Local Host)' : 'Cloud API'}`
+      
+      const codeScoreExtra = t.champion.codePassRate !== null ? ` · 🧪 Code Tests: ${t.champion.codePassRate}%` : ''
+      const peerScoreExtra = t.champion.avgPeerScore !== null ? ` · ⭐ Peer Rating: ${t.champion.avgPeerScore}/10` : ''
+      if (el.championStats) el.championStats.textContent = `⚡ Output Speed: ${t.champion.avgTps} tok/s${codeScoreExtra}${peerScoreExtra} · 💰 Cost Tier: ${t.champion.isLocal ? 'Free (Local Host)' : 'Cloud API'}`
     }
 
     // Visual Charts
     if (t.charts) {
       renderSpeedChart(t.charts.speedChart || [])
       renderLatencyChart(t.charts.latencyChart || [])
+      renderValidationChart(t.charts.validationChart || [])
+      renderPeerScoreChart(t.charts.peerScoreChart || [])
       renderSummaryTable(t.charts.summaryTable || [])
     }
+
+    // Frontier AI Judge Verdict Card
+    if (t.aiJudgeVerdict && t.aiJudgeVerdict.raw) {
+      if (el.colosseumJudgeCard) el.colosseumJudgeCard.style.display = 'block'
+      if (el.colosseumJudgeMeta) {
+        el.colosseumJudgeMeta.textContent = `🏛️ Grand Arbiter: ${t.aiJudgeVerdict.judgeProvider}:${t.aiJudgeVerdict.judgeModel}`
+      }
+      if (el.colosseumJudgeBody) {
+        el.colosseumJudgeBody.innerHTML = window.SavantMarkdown.render(t.aiJudgeVerdict.raw)
+      }
+    } else if (el.colosseumJudgeCard && !state.activeJudgeEventSource) {
+      el.colosseumJudgeCard.style.display = 'none'
+    }
+
+    // Peer Reviews Section
+    renderPeerReviewsSection(t)
 
     // Trial-by-Trial Accordion
     renderTrialsAccordion(t.questions || [], t.participants || [])
@@ -800,6 +1083,64 @@
     })
   }
 
+  function renderValidationChart(series) {
+    if (!el.chartValidationContainer || !el.cardChartValidation) return
+    if (!series || series.length === 0) {
+      el.cardChartValidation.style.display = 'none'
+      return
+    }
+
+    el.cardChartValidation.style.display = 'flex'
+    el.chartValidationContainer.innerHTML = ''
+
+    series.forEach((item, idx) => {
+      const row = document.createElement('div')
+      row.className = 'bar-chart-row'
+      const widthPct = Math.max(8, item.value)
+      const isTop = idx === 0 && item.value === 100
+
+      row.innerHTML = `
+        <div class="bar-chart-label-row">
+          <span class="bar-label">${isTop ? '👑 ' : ''}${window.SavantMarkdown.escapeHtml(item.name)} <span style="font-size: 11px; color: var(--text-muted);">(${window.SavantMarkdown.escapeHtml(item.label)})</span></span>
+          <span class="bar-value" style="color: var(--accent-green);">${item.value}% (${item.passed}/${item.total} passed)</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: ${widthPct}%; background: linear-gradient(90deg, #3fb950, #2ea043);"></div>
+        </div>
+      `
+      el.chartValidationContainer.appendChild(row)
+    })
+  }
+
+  function renderPeerScoreChart(series) {
+    if (!el.chartPeerscoreContainer || !el.cardChartPeerscore) return
+    if (!series || series.length === 0) {
+      el.cardChartPeerscore.style.display = 'none'
+      return
+    }
+
+    el.cardChartPeerscore.style.display = 'flex'
+    el.chartPeerscoreContainer.innerHTML = ''
+
+    series.forEach((item, idx) => {
+      const row = document.createElement('div')
+      row.className = 'bar-chart-row'
+      const widthPct = Math.max(8, Math.round((item.value / 10) * 100))
+      const isTop = idx === 0 && item.value > 0
+
+      row.innerHTML = `
+        <div class="bar-chart-label-row">
+          <span class="bar-label">${isTop ? '👑 ' : ''}${window.SavantMarkdown.escapeHtml(item.name)} <span style="font-size: 11px; color: var(--text-muted);">(${window.SavantMarkdown.escapeHtml(item.label)})</span></span>
+          <span class="bar-value" style="color: #d29922;">⭐ ${item.value} / 10</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill gold" style="width: ${widthPct}%;"></div>
+        </div>
+      `
+      el.chartPeerscoreContainer.appendChild(row)
+    })
+  }
+
   function renderSummaryTable(rows) {
     if (!el.tournamentSummaryTbody) return
     el.tournamentSummaryTbody.innerHTML = ''
@@ -808,10 +1149,20 @@
       const tr = document.createElement('tr')
       const costBadge = r.isLocal ? '<span class="tier-badge local">Free (Local)</span>' : '<span class="tier-badge">Cloud API</span>'
 
+      const testScoreText = r.codePassRate !== null
+        ? `<strong style="color: var(--accent-green);">${r.codePassRate}%</strong> <span style="font-size: 11px; color: var(--text-muted);">(${r.testsPassed}/${r.testsTotal})</span>`
+        : '<span style="color: var(--text-muted);">N/A</span>'
+
+      const peerScoreText = r.avgPeerScore !== null
+        ? `<strong style="color: #d29922;">⭐ ${r.avgPeerScore}</strong><span style="font-size: 11px; color: var(--text-muted);">/10 (${r.peerReviewsReceived})</span>`
+        : '<span style="color: var(--text-muted);">Pending</span>'
+
       tr.innerHTML = `
         <td><strong>#${idx + 1}</strong></td>
         <td><strong>${idx === 0 ? '👑 ' : ''}${window.SavantMarkdown.escapeHtml(r.gladiator)}</strong></td>
         <td><code>${window.SavantMarkdown.escapeHtml(r.model)}</code></td>
+        <td>${testScoreText}</td>
+        <td>${peerScoreText}</td>
         <td><strong style="color: #d29922;">${r.avgTps} tok/s</strong></td>
         <td>${r.avgTtftSec}s</td>
         <td>${r.avgDurationSec}s</td>
@@ -822,6 +1173,173 @@
     })
   }
 
+  function renderPeerReviewsSection(t) {
+    if (!el.peerReviewsCard) return
+
+    const allReviews = []
+    t.questions.forEach((q, qIdx) => {
+      (q.peerReviews || []).forEach((pr) => {
+        allReviews.push({
+          trialIndex: qIdx,
+          trialTitle: q.title,
+          trialCategory: q.category,
+          ...pr,
+        })
+      })
+    })
+
+    // Peer Scores Summary Cards
+    if (el.peerScoresLeaderboard) {
+      el.peerScoresLeaderboard.innerHTML = ''
+      t.participants.forEach((p) => {
+        const card = document.createElement('div')
+        card.className = 'peer-score-hero-card'
+        const scoreDisplay = p.avgPeerScore !== null
+          ? `${p.avgPeerScore} <span>/ 10</span>`
+          : '-- <span>/ 10</span>'
+
+        card.innerHTML = `
+          <div class="peer-score-hero-left">
+            <div class="peer-score-hero-name">${window.SavantMarkdown.escapeHtml(p.gladiatorName)}</div>
+            <div class="peer-score-hero-model">${window.SavantMarkdown.escapeHtml(p.provider)}:${window.SavantMarkdown.escapeHtml(p.model)}</div>
+          </div>
+          <div class="peer-score-hero-value">
+            ⭐ ${scoreDisplay}
+          </div>
+        `
+        el.peerScoresLeaderboard.appendChild(card)
+      })
+    }
+
+    // Populate Filters
+    if (el.peerFiltersBar && el.filterPeerReviewer && el.filterPeerTarget) {
+      if (allReviews.length > 0) {
+        el.peerFiltersBar.style.display = 'flex'
+        const curReviewer = el.filterPeerReviewer.value
+        const curTarget = el.filterPeerTarget.value
+
+        el.filterPeerReviewer.innerHTML = '<option value="">All Reviewers</option>'
+        el.filterPeerTarget.innerHTML = '<option value="">All Opponents</option>'
+
+        t.participants.forEach((p) => {
+          const optR = document.createElement('option')
+          optR.value = p.gladiatorKey
+          optR.textContent = `${p.gladiatorName} (${p.model})`
+          if (p.gladiatorKey === curReviewer) optR.selected = true
+          el.filterPeerReviewer.appendChild(optR)
+
+          const optT = document.createElement('option')
+          optT.value = p.gladiatorKey
+          optT.textContent = `${p.gladiatorName} (${p.model})`
+          if (p.gladiatorKey === curTarget) optT.selected = true
+          el.filterPeerTarget.appendChild(optT)
+        })
+      } else {
+        el.peerFiltersBar.style.display = 'none'
+      }
+    }
+
+    renderFilteredPeerReviews(allReviews)
+  }
+
+  function renderFilteredPeerReviews(allReviews) {
+    if (!el.peerReviewsGrid) return
+    el.peerReviewsGrid.innerHTML = ''
+
+    const reviewerFilter = el.filterPeerReviewer?.value || ''
+    const targetFilter = el.filterPeerTarget?.value || ''
+
+    const filtered = allReviews.filter((r) => {
+      if (reviewerFilter && r.reviewerKey !== reviewerFilter) return false
+      if (targetFilter && r.targetKey !== targetFilter) return false
+      return true
+    })
+
+    if (filtered.length === 0) {
+      if (allReviews.length === 0) {
+        el.peerReviewsGrid.innerHTML = `
+          <div class="peer-reviews-empty">
+            <span>⚔️ Click "Run Gladiator Peer Reviews" to have each AI gladiator review and score the opponent responses!</span>
+          </div>
+        `
+      } else {
+        el.peerReviewsGrid.innerHTML = `
+          <div class="peer-reviews-empty">
+            <span>No peer reviews match the selected filter.</span>
+          </div>
+        `
+      }
+      return
+    }
+
+    filtered.forEach((r) => {
+      const card = document.createElement('div')
+      card.className = 'peer-review-card'
+      card.innerHTML = `
+        <div class="peer-review-card-header">
+          <div class="peer-review-duel-tag">
+            <span class="peer-reviewer-tag">🤺 ${window.SavantMarkdown.escapeHtml(r.reviewerName)} (${window.SavantMarkdown.escapeHtml(r.reviewerModel)})</span>
+            <span>➔</span>
+            <span class="peer-target-tag">🎯 ${window.SavantMarkdown.escapeHtml(r.targetName)} (${window.SavantMarkdown.escapeHtml(r.targetModel)})</span>
+          </div>
+          <span class="peer-score-pill">⭐ ${r.score} / 10</span>
+        </div>
+        <div class="peer-review-trial-badge">
+          📜 <strong>Trial ${r.trialIndex + 1}: ${window.SavantMarkdown.escapeHtml(r.trialTitle)}</strong> (${window.SavantMarkdown.escapeHtml(r.trialCategory || '')})
+        </div>
+        <div class="peer-review-content message-content">
+          ${window.SavantMarkdown.render(r.review)}
+        </div>
+      `
+      el.peerReviewsGrid.appendChild(card)
+    })
+  }
+
+  async function triggerGladiatorPeerReviews() {
+    if (!state.currentTournamentId) return
+    if (el.btnTriggerPeerReviews) {
+      el.btnTriggerPeerReviews.disabled = true
+      el.btnTriggerPeerReviews.innerHTML = '<span class="thinking-spinner"></span> <span>Reviewing Opponent Solutions...</span>'
+    }
+
+    try {
+      const res = await fetch(`/tournaments/${state.currentTournamentId}/peer-reviews`, {
+        method: 'POST',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      // Poll until reviews populate
+      let attempts = 0
+      const pollTimer = setInterval(async () => {
+        attempts++
+        try {
+          const tRes = await fetch(`/tournaments/${state.currentTournamentId}`)
+          if (tRes.ok) {
+            const tourney = await tRes.json()
+            state.currentTournament = tourney
+            if (tourney.peerReviewsCount > 0 || attempts > 20) {
+              clearInterval(pollTimer)
+              if (el.btnTriggerPeerReviews) {
+                el.btnTriggerPeerReviews.disabled = false
+                el.btnTriggerPeerReviews.innerHTML = '<span>⚡ Run Gladiator Peer Reviews</span>'
+              }
+              renderTournamentResults(tourney)
+            }
+          }
+        } catch (e) {
+          console.warn('[gateway] poll peer reviews error:', e)
+        }
+      }, 1000)
+    } catch (err) {
+      console.error('[gateway] triggerPeerReviews error:', err)
+      if (el.btnTriggerPeerReviews) {
+        el.btnTriggerPeerReviews.disabled = false
+        el.btnTriggerPeerReviews.innerHTML = '<span>⚡ Run Gladiator Peer Reviews</span>'
+      }
+      alert(`Peer reviews request failed: ${err.message}`)
+    }
+  }
+
   function renderTrialsAccordion(questions, participants) {
     if (!el.trialsAccordion) return
     el.trialsAccordion.innerHTML = ''
@@ -830,10 +1348,15 @@
       const item = document.createElement('div')
       item.className = 'trial-accordion-item'
 
+      const hasTests = Array.isArray(q.testCases) && q.testCases.length > 0
+      const testBadge = hasTests
+        ? `<span class="val-badge passed" style="font-size: 10px; margin-left: 6px;">🧪 ${q.testCases.length} Tests</span>`
+        : ''
+
       const header = document.createElement('div')
       header.className = 'trial-accordion-header'
       header.innerHTML = `
-        <span>Trial ${qIdx + 1}: <strong>${window.SavantMarkdown.escapeHtml(q.title)}</strong> (${window.SavantMarkdown.escapeHtml(q.category)})</span>
+        <span>Trial ${qIdx + 1}: <strong>${window.SavantMarkdown.escapeHtml(q.title)}</strong> (${window.SavantMarkdown.escapeHtml(q.category)})${testBadge}</span>
         <span>▼</span>
       `
 
@@ -846,6 +1369,23 @@
         card.className = 'trial-response-card'
 
         const speedText = run.benchmark ? `⚡ ${run.benchmark.tokensPerSecond} tok/s · ${(run.benchmark.totalSec)}s` : '--'
+        let validationHtml = ''
+
+        if (run.validation) {
+          const isPassed = run.validation.status === 'passed'
+          const badgeClass = isPassed ? 'passed' : (run.validation.status === 'failed' ? 'failed' : 'error')
+          const badgeIcon = isPassed ? '✓' : (run.validation.status === 'failed' ? '✗' : '⚠')
+
+          validationHtml = `
+            <div style="margin-top: 10px; padding: 8px 10px; background: rgba(0,0,0,0.15); border-radius: 4px; border: 1px solid var(--border-color);">
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 6px;">
+                <span class="val-badge ${badgeClass}">${badgeIcon} ${run.validation.status.toUpperCase()}</span>
+                <strong style="color: ${isPassed ? 'var(--accent-green)' : 'var(--accent-red)'};">${run.validation.passedCount}/${run.validation.totalCount} Tests (${run.validation.passRate}%)</strong>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Duration: ${run.validation.durationMs}ms</div>
+            </div>
+          `
+        }
 
         card.innerHTML = `
           <div class="trial-response-card-header">
@@ -855,9 +1395,42 @@
           <div class="trial-response-card-body message-content">
             ${window.SavantMarkdown.render(run.response || '(No response recorded)')}
           </div>
+          ${validationHtml}
         `
         body.appendChild(card)
       })
+
+      // Peer reviews for this specific trial
+      if (Array.isArray(q.peerReviews) && q.peerReviews.length > 0) {
+        const reviewsBox = document.createElement('div')
+        reviewsBox.style.gridColumn = '1 / -1'
+        reviewsBox.style.marginTop = '10px'
+        reviewsBox.style.padding = '12px'
+        reviewsBox.style.background = 'var(--bg-surface)'
+        reviewsBox.style.borderRadius = 'var(--radius-sm)'
+        reviewsBox.style.border = '1px solid var(--border-color)'
+
+        let reviewsHtml = `<h4 style="font-size: 12px; margin: 0 0 10px 0; color: #d29922;">🤺 Gladiator Peer Reviews for Trial ${qIdx + 1}</h4>`
+        reviewsHtml += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;">`
+
+        q.peerReviews.forEach((pr) => {
+          reviewsHtml += `
+            <div style="padding: 10px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span class="peer-reviewer-tag" style="font-size: 11px;">${window.SavantMarkdown.escapeHtml(pr.reviewerName)}</span>
+                <span class="peer-score-pill" style="font-size: 11px;">⭐ ${pr.score}/10</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Reviewing: <strong>${window.SavantMarkdown.escapeHtml(pr.targetName)}</strong></div>
+              <div class="message-content" style="font-size: 11.5px; line-height: 1.4; max-height: 150px; overflow-y: auto;">
+                ${window.SavantMarkdown.render(pr.review)}
+              </div>
+            </div>
+          `
+        })
+        reviewsHtml += `</div>`
+        reviewsBox.innerHTML = reviewsHtml
+        body.appendChild(reviewsBox)
+      }
 
       header.onclick = () => {
         body.style.display = body.style.display === 'none' ? 'grid' : 'none'
@@ -876,8 +1449,8 @@
 
     if (el.colosseumJudgeCard) {
       el.colosseumJudgeCard.style.display = 'block'
-      el.colosseumJudgeMeta.textContent = 'Evaluating whole tournament trials...'
-      el.colosseumJudgeBody.innerHTML = '<span class="thinking-spinner"></span> Colosseum AI Judge is evaluating all trials...'
+      el.colosseumJudgeMeta.textContent = 'Frontier AI Grand Arbiter evaluating Code, Speed, Logic, and Conversation domains...'
+      el.colosseumJudgeBody.innerHTML = '<span class="thinking-spinner"></span> Frontier AI Arbiter is evaluating all gladiator trials and synthesizing domain verdicts...'
       el.colosseumJudgeCard.scrollIntoView({ behavior: 'smooth' })
     }
 
@@ -893,11 +1466,14 @@
       }
 
       const data = await res.json()
+      if (el.colosseumJudgeMeta) {
+        el.colosseumJudgeMeta.textContent = `🏛️ Grand Arbiter: ${data.judgeProvider}:${data.judgeModel}`
+      }
       startTournamentJudgeStream(data.judgeRunId, data.judgeProvider, data.judgeModel)
     } catch (err) {
       console.error('[gateway] requestTournamentJudge error:', err)
       if (el.colosseumJudgeBody) {
-        el.colosseumJudgeBody.innerHTML = `<div style="color: var(--accent-red);">Error: ${window.SavantMarkdown.escapeHtml(err.message)}</div>`
+        el.colosseumJudgeBody.innerHTML = `<div style="color: var(--accent-red);">Verdict request error: ${window.SavantMarkdown.escapeHtml(err.message)}</div>`
       }
     }
   }
@@ -1643,6 +2219,34 @@
     el.btnPresetLocalCloud?.addEventListener('click', () => applyTournamentPreset('local-cloud'))
     el.btnPresetFastest?.addEventListener('click', () => applyTournamentPreset('fastest'))
 
+    // Custom Coding Challenge Modal listeners
+    el.btnOpenCustomTrial?.addEventListener('click', openCustomTrialModal)
+    el.btnCloseCustomTrial?.addEventListener('click', closeCustomTrialModal)
+    el.btnCancelCustomTrial?.addEventListener('click', closeCustomTrialModal)
+    el.btnAddTestCaseRow?.addEventListener('click', () => addTestCaseRow())
+    el.btnSaveCustomTrial?.addEventListener('click', saveCustomTrial)
+
+    // Peer reviews trigger and filter change listeners
+    el.btnTriggerPeerReviews?.addEventListener('click', triggerGladiatorPeerReviews)
+    el.filterPeerReviewer?.addEventListener('change', () => {
+      const allReviews = []
+      state.currentTournament?.questions?.forEach((q, qIdx) => {
+        (q.peerReviews || []).forEach((pr) => {
+          allReviews.push({ trialIndex: qIdx, trialTitle: q.title, trialCategory: q.category, ...pr })
+        })
+      })
+      renderFilteredPeerReviews(allReviews)
+    })
+    el.filterPeerTarget?.addEventListener('change', () => {
+      const allReviews = []
+      state.currentTournament?.questions?.forEach((q, qIdx) => {
+        (q.peerReviews || []).forEach((pr) => {
+          allReviews.push({ trialIndex: qIdx, trialTitle: q.title, trialCategory: q.category, ...pr })
+        })
+      })
+      renderFilteredPeerReviews(allReviews)
+    })
+
     // AI Judge
     el.btnRequestJudge?.addEventListener('click', requestTournamentJudge)
 
@@ -1778,6 +2382,28 @@
       }
     })
 
+    // Code copy button clicks
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.copy-code-btn')
+      if (btn) {
+        const code = btn.dataset.code || btn.closest('.code-container')?.querySelector('code')?.textContent || ''
+        if (code) {
+          try {
+            await navigator.clipboard.writeText(code)
+            const origHtml = btn.innerHTML
+            btn.innerHTML = '<span>✓ Copied!</span>'
+            btn.classList.add('copied')
+            setTimeout(() => {
+              btn.innerHTML = origHtml
+              btn.classList.remove('copied')
+            }, 2000)
+          } catch (err) {
+            console.warn('Clipboard write failed:', err)
+          }
+        }
+      }
+    })
+
     // Keyboard shortcuts: Cmd+K / Ctrl+K for New Chat
     document.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -1786,6 +2412,18 @@
         createNewChat()
       }
     })
+
+    // Auto-discover models when returning to window/tab
+    window.addEventListener('focus', () => {
+      loadModels(true)
+    })
+
+    // Periodic auto-discovery poll every 15 seconds
+    setInterval(() => {
+      if (!state.isGenerating && !state.isTournamentRunning) {
+        loadModels(true)
+      }
+    }, 15_000)
   }
 
   // ── App Init ──
