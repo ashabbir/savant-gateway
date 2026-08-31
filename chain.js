@@ -58,7 +58,7 @@ async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
 }
 
 async function executeWalkStep(step, prompt, callbacks) {
-  const { onThinking, onChunk, onKill, cwd, system, spawnAgent: spawn = spawnAgent } = callbacks
+  const { onThinking, onChunk, onKill, cwd, spawnAgent: spawn = spawnAgent } = callbacks
   const adapter = ADAPTERS[step.provider]
   if (!adapter) {
     onThinking?.({ provider: step.provider, model: step.model, tag: step.provider, status: 'skip', reason: 'unknown provider' })
@@ -70,7 +70,7 @@ async function executeWalkStep(step, prompt, callbacks) {
 
   let argv
   try {
-    argv = buildArgv(step, prompt, system)
+    argv = buildArgv(step, prompt)
   } catch (err) {
     onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: err.message })
     return { type: 'error', error: err }

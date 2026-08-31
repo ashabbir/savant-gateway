@@ -103,7 +103,6 @@ function createRun(params = {}) {
     staggerMs: Math.max(0, Number(params.staggerMs) || 0),
     startedAt: Date.now(),
     cwd: typeof params.cwd === 'string' && params.cwd ? params.cwd : undefined,
-    system: typeof params.system === 'string' && params.system ? params.system : undefined,
   }
 }
 
@@ -183,7 +182,6 @@ async function executeRun(run, runsMap, cleanupFiles, sessionStore) {
       },
       onKill: (fn) => { run.kill = fn },
       cwd: run.cwd,
-      system: run.system,
       concurrency: run.concurrency,
       staggerMs: run.staggerMs,
     })
