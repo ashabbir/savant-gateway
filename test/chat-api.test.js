@@ -2,6 +2,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const app = require('../server')
 const chainLib = require('../chain')
+const adapters = require('../adapters')
 
 let server
 let baseUrl
@@ -130,6 +131,101 @@ test('Chat and Session API Endpoints', async (t) => {
     assert.equal(res.status, 202)
     const data = await res.json()
     assert.ok(data.id)
+  })
+
+  await t.test('active run messages steer by default and can be queued', async () => {
+    test.mock.method(chainLib, 'raceChain', async (_prompt, _chain, callbacks) => {
+      callbacks.onKill?.(() => {})
+      return new Promise(() => {})
+    })
+
+    t.mock.method(adapters.ADAPTERS.codex, 'discoverModels', async () => ['fresh-route-model'])
+    const modelsRes = await fetch(`${baseUrl}/models`)
+    const { providers } = await modelsRes.json()
+    assert.ok(providers.find((provider) => provider.id === 'codex').models.includes('fresh-route-model'))
+    const provider = providers[0]
+    assert.ok(provider)
+
+    const createRes = await fetch(`${baseUrl}/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: 'Start the task',
+        chain: [{ provider: provider.id, model: provider.defaultModel }],
+        thinking_level: 'high',
+      }),
+    })
+    assert.equal(createRes.status, 202)
+    const created = await createRes.json()
+    assert.equal(created.thinkingLevel, 'high')
+
+    const queueRes = await fetch(`${baseUrl}/runs/${created.id}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'Do this after the current answer', mode: 'queue' }),
+    })
+    assert.equal(queueRes.status, 202)
+    const queued = await queueRes.json()
+    assert.equal(queued.status, 'queued')
+    assert.equal(queued.position, 1)
+
+    const steerRes = await fetch(`${baseUrl}/runs/${created.id}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedback: 'Change direction now' }),
+    })
+    assert.equal(steerRes.status, 202)
+    const steered = await steerRes.json()
+    assert.equal(steered.status, 'steering')
+    assert.equal(steered.mode, 'steer')
+
+    const stateRes = await fetch(`${baseUrl}/runs/${created.id}`)
+    const state = await stateRes.json()
+    assert.equal(state.thinkingLevel, 'high')
+    assert.equal(state.queuedMessages, 1)
+
+    const invalidRes = await fetch(`${baseUrl}/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: 'Invalid effort',
+        chain: [{ provider: provider.id, model: provider.defaultModel }],
+        thinking_level: 'max',
+      }),
+    })
+    assert.equal(invalidRes.status, 400)
+
+    const sessionStartRes = await fetch(`${baseUrl}/sessions/${createdSessionId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: 'Start a long session turn',
+        provider: provider.id,
+        model: provider.defaultModel,
+      }),
+    })
+    assert.equal(sessionStartRes.status, 202)
+    const sessionStart = await sessionStartRes.json()
+
+    const sessionQueueRes = await fetch(`${baseUrl}/sessions/${createdSessionId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'Answer this next', mode: 'queue' }),
+    })
+    assert.equal(sessionQueueRes.status, 202)
+    const sessionQueued = await sessionQueueRes.json()
+    assert.equal(sessionQueued.id, sessionStart.id)
+    assert.equal(sessionQueued.status, 'queued')
+
+    const sessionSteerRes = await fetch(`${baseUrl}/sessions/${createdSessionId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'Use this direction immediately' }),
+    })
+    assert.equal(sessionSteerRes.status, 202)
+    const sessionSteered = await sessionSteerRes.json()
+    assert.equal(sessionSteered.id, sessionStart.id)
+    assert.equal(sessionSteered.status, 'steering')
   })
 
   await t.test('DELETE /sessions/:id deletes the session', async () => {

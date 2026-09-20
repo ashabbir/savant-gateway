@@ -2,7 +2,15 @@ const express = require('express')
 const path = require('path')
 const { randomUUID } = require('crypto')
 const { version } = require('./package.json')
-const { ADAPTERS, DEFAULT_CHAIN, PROVIDER_NAMES, DISABLED_PROVIDERS, scheduleModelRefresh, refreshAllModels } = require('./adapters')
+const {
+  ADAPTERS,
+  DEFAULT_CHAIN,
+  PROVIDER_NAMES,
+  DISABLED_PROVIDERS,
+  normalizeThinkingLevel,
+  scheduleModelRefresh,
+  refreshModelsFresh,
+} = require('./adapters')
 const { upload, buildPromptWithFiles, cleanupFiles, MAX_FILES, MAX_FILE_BYTES } = require('./uploads')
 const { SessionStore, formatChatPrompt } = require('./sessions')
 const { ComparisonStore, buildJudgePrompt } = require('./comparisons')
@@ -19,6 +27,8 @@ const {
   corsMiddleware,
   parseChain,
   filterActiveProviders,
+  normalizeMessageMode,
+  submitRunMessage,
 } = require('./server-helpers')
 
 const app = express()
@@ -88,6 +98,14 @@ app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
     })
   }
 
+  let thinkingLevel
+  try {
+    thinkingLevel = normalizeThinkingLevel(req.body?.thinking_level ?? req.body?.thinkingLevel)
+  } catch (error) {
+    cleanupFiles(req.files)
+    return res.status(400).json({ error: error.message })
+  }
+
   const id = randomUUID()
   const runCwd = typeof cwd === 'string' && cwd ? cwd : undefined
   const requestedStagger = req.body?.stagger_ms ?? process.env.GATEWAY_RACE_STAGGER_MS ?? DEFAULT_STAGGER_MS
@@ -101,12 +119,13 @@ app.post('/runs', upload.array('files', MAX_FILES), (req, res) => {
     concurrency: req.body?.concurrency || process.env.GATEWAY_RACE_CONCURRENCY || 2,
     staggerMs: requestedStagger,
     cwd: runCwd,
+    thinkingLevel,
   })
   runs.set(id, run)
 
   executeRun(run, runs, cleanupFiles, sessionStore)
 
-  res.status(202).json({ id, status: 'running' })
+  res.status(202).json({ id, status: 'running', thinkingLevel })
 })
 
 // ── GET /runs/:id/stream ──────────────────────────────────────────────────────
@@ -133,7 +152,14 @@ app.get('/runs/:id/stream', (req, res) => {
 app.get('/runs/:id', (req, res) => {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'run not found' })
-  res.json({ id: run.id, status: run.status, result: run.result, error: run.error })
+  res.json({
+    id: run.id,
+    status: run.status,
+    result: run.result,
+    error: run.error,
+    thinkingLevel: run.thinkingLevel,
+    queuedMessages: run.messageQueue.length,
+  })
 })
 
 // ── DELETE /runs/:id ──────────────────────────────────────────────────────────
@@ -151,23 +177,39 @@ app.delete('/runs/:id', (req, res) => {
   res.json({ ok: true })
 })
 
-// ── POST /runs/:id/feedback ──────────────────────────────────────────────────
-app.post('/runs/:id/feedback', (req, res) => {
+// ── POST /runs/:id/feedback and /messages ────────────────────────────────────
+function postRunMessage(req, res) {
   const run = runs.get(req.params.id)
   if (!run) return res.status(404).json({ error: 'run not found' })
   if (run.status !== 'running') return res.status(409).json({ error: `run is ${run.status}` })
 
-  const { feedback } = req.body || {}
-  if (!feedback || typeof feedback !== 'string' || !feedback.trim()) {
-    return res.status(400).json({ error: 'feedback (non-empty string) is required' })
+  const body = req.body || {}
+  const message = body.feedback ?? body.message ?? body.content
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: 'feedback or message (non-empty string) is required' })
   }
 
-  run.feedback.push(feedback.trim())
-  emit(run, { type: 'steering', feedback: feedback.trim(), restart: true })
-  run.kill?.()
-  executeRun(run, runs, cleanupFiles, sessionStore)
-  res.status(202).json({ id: run.id, status: 'steering', feedbackCount: run.feedback.length })
-})
+  let mode
+  try {
+    mode = normalizeMessageMode(body.mode)
+  } catch (error) {
+    return res.status(400).json({ error: error.message })
+  }
+
+  const result = submitRunMessage(run, message, mode)
+  if (mode === 'steer' && run.session_id) {
+    sessionStore.addMessage(run.session_id, { role: 'user', content: message.trim() })
+  }
+  if (mode === 'steer') executeRun(run, runs, cleanupFiles, sessionStore)
+  res.status(202).json({
+    id: run.id,
+    status: mode === 'steer' ? 'steering' : 'queued',
+    ...result,
+  })
+}
+
+app.post('/runs/:id/feedback', postRunMessage)
+app.post('/runs/:id/messages', postRunMessage)
 
 // ── GET /runs ─────────────────────────────────────────────────────────────────
 app.get('/runs', (req, res) => {
@@ -192,6 +234,8 @@ app.get('/runs', (req, res) => {
     error: r.error || null,
     promptSnippet: null,
     eventCount: r.events.length,
+    thinkingLevel: r.thinkingLevel,
+    queuedMessages: r.messageQueue.length,
   })))
 })
 
@@ -208,6 +252,8 @@ app.get('/runs/:id/events', (req, res) => {
     elapsedMs: Date.now() - run.startedAt,
     result: run.result,
     error: run.error,
+    thinkingLevel: run.thinkingLevel,
+    queuedMessages: run.messageQueue.length,
     events: run.events,
   })
 })
@@ -264,6 +310,58 @@ app.post('/sessions/:id/messages', upload.array('files', MAX_FILES), (req, res) 
   if (!rawPrompt || typeof rawPrompt !== 'string' || !rawPrompt.trim()) {
     cleanupFiles(req.files)
     return res.status(400).json({ error: 'prompt or message (string) is required' })
+  }
+
+  let thinkingLevel
+  try {
+    thinkingLevel = normalizeThinkingLevel(req.body?.thinking_level ?? req.body?.thinkingLevel)
+  } catch (error) {
+    cleanupFiles(req.files)
+    return res.status(400).json({ error: error.message })
+  }
+
+  const activeRun = [...runs.values()].find(
+    (candidate) => candidate.session_id === session.id && candidate.status === 'running',
+  )
+  if (activeRun) {
+    let mode
+    try {
+      mode = normalizeMessageMode(req.body?.mode)
+    } catch (error) {
+      cleanupFiles(req.files)
+      return res.status(400).json({ error: error.message })
+    }
+
+    const message = buildPromptWithFiles(rawPrompt.trim(), req.files)
+    activeRun.files.push(...(req.files || []))
+    activeRun.thinkingLevel = thinkingLevel
+    const result = submitRunMessage(activeRun, message, mode)
+    let userMessage = null
+    const fileMetadata = (req.files || []).map((file) => ({
+      originalname: file.originalname,
+      filename: file.filename,
+      size: file.size,
+      mimetype: file.mimetype,
+    }))
+    if (mode === 'steer') {
+      userMessage = sessionStore.addMessage(session.id, {
+        role: 'user',
+        content: rawPrompt.trim(),
+        files: fileMetadata,
+      })
+      executeRun(activeRun, runs, cleanupFiles, sessionStore)
+    } else {
+      activeRun.queuedUserFiles[activeRun.queuedUserFiles.length - 1] = fileMetadata
+      activeRun.queuedUserContents[activeRun.queuedUserContents.length - 1] = rawPrompt.trim()
+    }
+
+    return res.status(202).json({
+      id: activeRun.id,
+      sessionId: session.id,
+      status: mode === 'steer' ? 'steering' : 'queued',
+      userMessage,
+      ...result,
+    })
   }
 
   // Add user message to session
@@ -326,6 +424,7 @@ app.post('/sessions/:id/messages', upload.array('files', MAX_FILES), (req, res) 
     concurrency: req.body?.concurrency || process.env.GATEWAY_RACE_CONCURRENCY || 2,
     staggerMs: requestedStagger,
     cwd: runCwd,
+    thinkingLevel,
   })
   runs.set(id, run)
 
@@ -335,15 +434,22 @@ app.post('/sessions/:id/messages', upload.array('files', MAX_FILES), (req, res) 
     id,
     sessionId: session.id,
     status: 'running',
+    thinkingLevel,
     userMessage: userMsg,
   })
 })
 
 // ── GET /models ──────────────────────────────────────────────────────────────
-app.get(['/models', '/api/models', '/providers', '/api/providers'], (req, res) => {
-  const force = req.query.refresh === 'true' || req.query.refresh === '1'
-  scheduleModelRefresh(force)
-  const providers = Object.keys(ADAPTERS).map((id) => {
+app.get(['/models', '/api/models', '/providers', '/api/providers'], async (req, res) => {
+  const refresh = refreshModelsFresh()
+  if (refresh) {
+    try {
+      await refresh
+    } catch (error) {
+      console.error('[savant-gateway] model refresh failed:', error.message)
+    }
+  }
+  const providers = PROVIDER_NAMES.map((id) => {
     const adapter = ADAPTERS[id]
     return {
       id,
@@ -352,9 +458,11 @@ app.get(['/models', '/api/models', '/providers', '/api/providers'], (req, res) =
       enabled: PROVIDER_NAMES.includes(id),
       defaultModel: adapter.defaultModel,
       models: adapter.availableModels,
+      thinkingLevels: ['low', 'medium', 'high'],
+      defaultThinkingLevel: 'medium',
     }
   })
-  res.json({ providers })
+  res.json({ providers, refreshing: false })
 })
 
 // ── GET /comparisons ──────────────────────────────────────────────────────────
@@ -880,7 +988,8 @@ app.post('/validate-code', (req, res) => {
 // ── GET /health & /status ───────────────────────────────────────────────────
 app.get(['/health', '/status', '/api/health', '/api/status'], (req, res) => {
   const force = req.query.refresh === 'true' || req.query.refresh === '1'
-  scheduleModelRefresh(force)
+  const refresh = scheduleModelRefresh(force)
+  refresh?.catch((error) => console.error('[savant-gateway] model refresh failed:', error.message))
   res.json({
     ok: true,
     service: 'savant-gateway',
@@ -902,7 +1011,9 @@ app.get(['/health', '/status', '/api/health', '/api/status'], (req, res) => {
       default: 'race',
       concurrency: Number(process.env.GATEWAY_RACE_CONCURRENCY) || 2,
       staggerMs: Number(process.env.GATEWAY_RACE_STAGGER_MS) || 250,
+      defaultThinkingLevel: 'medium',
     },
+    modelRefreshInProgress: Boolean(refresh),
     uploads: { maxFiles: MAX_FILES, maxFileBytes: MAX_FILE_BYTES },
     uptime: process.uptime(),
   })
@@ -917,6 +1028,10 @@ app.use((err, _req, res, _next) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.GATEWAY_PORT) || 3100
 const HOST = '127.0.0.1'
+
+scheduleModelRefresh()?.catch((error) => {
+  console.error('[savant-gateway] initial model refresh failed:', error.message)
+})
 
 if (require.main === module) {
   app.listen(PORT, HOST, () => {

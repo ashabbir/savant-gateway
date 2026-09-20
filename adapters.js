@@ -1,7 +1,17 @@
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-const { spawnSync } = require('child_process')
+const { spawn, spawnSync } = require('child_process')
+
+const THINKING_LEVELS = new Set(['low', 'medium', 'high'])
+
+function normalizeThinkingLevel(value) {
+  const level = String(value || 'medium').toLowerCase()
+  if (!THINKING_LEVELS.has(level)) {
+    throw new Error('thinking_level must be one of: low, medium, high')
+  }
+  return level
+}
 
 // Same PATH augmentation as Quorum's main.ts — GUI-launched processes don't
 // inherit the shell PATH so homebrew/local bins are invisible otherwise.
@@ -66,10 +76,33 @@ const isQuotaError = (res) => typeof res === 'string' && QUOTA_PATTERNS.some((re
 function resolveModel(adapter, model) {
   if (!adapter) return model || ''
   const requested = model || adapter.defaultModel
+  if (requested === 'configured') return ''
   if (requested && adapter.modelAliases && Object.hasOwn(adapter.modelAliases, requested)) {
     return adapter.modelAliases[requested]
   }
   return requested
+}
+
+function runDiscovery(command, args, { timeout = 5_000, env = buildChildEnv() } = {}) {
+  return new Promise((resolve) => {
+    let settled = false
+    let stdout = ''
+    const child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'ignore'] })
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(value)
+    }
+    const timer = setTimeout(() => {
+      try { child.kill('SIGKILL') } catch {}
+      finish('')
+    }, timeout)
+    timer.unref?.()
+    child.stdout.on('data', (chunk) => { stdout += chunk.toString() })
+    child.on('error', () => finish(''))
+    child.on('close', (code) => finish(code === 0 ? stdout : ''))
+  })
 }
 
 const HERMES_PYTHON = process.env.HERMES_PYTHON || path.join(
@@ -80,18 +113,18 @@ const HERMES_PYTHON = process.env.HERMES_PYTHON || path.join(
  * Discovers available models from local Hermes CLI if installed.
  * @returns {Array<string>}
  */
-function discoverHermesModels() {
+async function discoverHermesModels() {
   if (!fs.existsSync(HERMES_PYTHON)) return []
 
-  const probe = spawnSync(HERMES_PYTHON, ['-c', [
+  const output = await runDiscovery(HERMES_PYTHON, ['-c', [
     'import json',
     'from hermes_cli.model_switch import list_authenticated_providers',
     'print(json.dumps(list_authenticated_providers(max_models=10000)))',
-  ].join('; ')], { encoding: 'utf8', timeout: 5_000 })
+  ].join('; ')])
 
-  if (probe.status !== 0 || !probe.stdout) return []
+  if (!output) return []
   try {
-    const providers = JSON.parse(probe.stdout)
+    const providers = JSON.parse(output)
     if (!Array.isArray(providers)) return []
     return providers.flatMap((provider) => (provider && Array.isArray(provider.models) ? provider.models : []).map(
       (model) => `${provider.slug}/${model}`,
@@ -126,14 +159,24 @@ function discoverCodexModels() {
  * Discovers models from AGY CLI.
  * @returns {Array<string>}
  */
-function discoverAgyModels() {
-  const probe = spawnSync('agy', ['models'], {
-    env: buildChildEnv(),
-    encoding: 'utf8',
-    timeout: 5_000,
-  })
-  if (probe.status !== 0 || !probe.stdout) return []
-  return [...new Set(probe.stdout.split(/\r?\n/).map((model) => model.trim()).filter(Boolean))]
+function parseDiscoveredModels(output) {
+  if (typeof output !== 'string') return []
+  return [...new Set(output
+    .split(/\r?\n/)
+    .map((line) => line.trim().split(/\t|\s{2,}/)[0]?.trim())
+    .filter((model) => model && !/^fetching\b/i.test(model)))]
+}
+
+async function discoverCliModels(command) {
+  return parseDiscoveredModels(await runDiscovery(command, ['models']))
+}
+
+async function discoverAgyModels() {
+  return discoverCliModels('agy')
+}
+
+async function discoverGeminiModels() {
+  return discoverCliModels('gemini')
 }
 
 /**
@@ -156,102 +199,87 @@ function parseOllamaModels(output) {
  *
  * @returns {Array<string>}
  */
-function discoverOllamaModels() {
-  const probe = spawnSync('ollama', ['list'], {
-    env: buildChildEnv(),
-    encoding: 'utf8',
-    timeout: 5_000,
-  })
-  if (probe.status !== 0 || !probe.stdout) return []
-  return parseOllamaModels(probe.stdout)
+async function discoverOllamaModels() {
+  return parseOllamaModels(await runDiscovery('ollama', ['list']))
 }
 
 const ADAPTERS = {
   claude: {
     name: 'claude',
     label: 'Claude',
+    priority: 30,
     baseArgv: ['claude', '-p', '--dangerously-skip-permissions'],
     modelArgv: (model) => (model ? ['--model', model] : []),
+    thinkingArgv: (level) => ['--effort', level],
     promptArgv: (prompt) => [prompt],
-    defaultModel: 'haiku',
-    availableModels: [
-      'haiku',
-      'sonnet',
-      'opus',
-      'claude-haiku-4-5-20251001',
-      'claude-sonnet-4-6',
-      'claude-opus-4-7',
-    ],
+    usesConfiguredModel: true,
+    defaultModel: 'configured',
+    availableModels: ['configured'],
   },
   copilot: {
     name: 'copilot',
     label: 'Copilot',
+    priority: 40,
     baseArgv: ['copilot', '--allow-all'],
     modelArgv: (model) => (model ? ['--model', model] : []),
+    thinkingArgv: (level) => ['--effort', level],
     promptArgv: (prompt) => ['--prompt', prompt],
-    defaultModel: 'claude-haiku-4.5',
-    availableModels: [
-      'claude-haiku-4.5',
-      'claude-sonnet-4.6',
-      'claude-opus-4.7',
-      'gpt-4.1',
-      'gpt-5-mini',
-    ],
+    usesConfiguredModel: true,
+    defaultModel: 'configured',
+    availableModels: ['configured'],
   },
   codex: {
     name: 'codex',
     label: 'Codex',
+    priority: 10,
     baseArgv: ['codex', 'exec', '--sandbox', 'workspace-write', '--skip-git-repo-check'],
     modelAliases: {
-      fast: 'gpt-5.5',
+      fast: '',
     },
-    modelArgv: (model) => (model ? ['--model', model, '-c', 'service_tier="fast"'] : []),
-    promptArgv: (prompt) => [prompt],
-    defaultModel: 'fast',
-    availableModels: [
-      'fast',
-      'gpt-5.5',
+    modelArgv: (model) => [
+      ...(model ? ['--model', model] : []),
+      '-c', 'service_tier="fast"',
     ],
+    thinkingArgv: (level) => ['-c', `model_reasoning_effort="${level}"`],
+    promptArgv: (prompt) => [prompt],
+    discoverModels: async () => discoverCodexModels(),
+    usesConfiguredModel: true,
+    defaultModel: 'configured',
+    availableModels: ['configured'],
   },
   gemini: {
     name: 'gemini',
     label: 'Gemini',
+    priority: 50,
     baseArgv: ['gemini', '--dangerously-skip-permissions'],
     modelArgv: (model) => (model ? ['--model', model] : []),
+    thinkingArgv: (level) => ['--effort', level],
     promptArgv: (prompt) => ['--print', prompt],
-    defaultModel: 'gemini-2.5-flash',
-    availableModels: [
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-exp',
-    ],
+    discoverModels: discoverGeminiModels,
+    usesConfiguredModel: true,
+    defaultModel: 'configured',
+    availableModels: ['configured'],
   },
   agy: {
     name: 'agy',
     label: 'AGY',
+    priority: 60,
     baseArgv: ['agy', '--dangerously-skip-permissions'],
     modelAliases: {
-      fast: 'Gemini 3.5 Flash (Low)',
+      fast: '',
     },
     modelArgv: (model) => (model ? ['--model', model] : []),
+    thinkingArgv: (level) => ['--effort', level],
     promptArgv: (prompt) => ['-p', prompt],
-    defaultModel: 'fast',
-    availableModels: [
-      'fast',
-      'Gemini 3.5 Flash (Medium)',
-      'Gemini 3.5 Flash (High)',
-      'Gemini 3.5 Flash (Low)',
-      'Gemini 3.1 Pro (Low)',
-      'Gemini 3.1 Pro (High)',
-      'Claude Sonnet 4.6 (Thinking)',
-      'Claude Opus 4.6 (Thinking)',
-      'GPT-OSS 120B (Medium)',
-    ],
+    discoverModels: discoverAgyModels,
+    usesConfiguredModel: true,
+    defaultModel: 'configured',
+    availableModels: ['configured'],
   },
   hermes: {
     name: 'hermes',
     label: 'Hermes',
+    priority: 20,
     baseArgv: ['hermes', '--yolo'],
     modelArgv: (model) => {
       if (!model || model === 'configured') return []
@@ -262,46 +290,56 @@ const ADAPTERS = {
         '--model', model.slice(separator + 1),
       ]
     },
+    thinkingArgv: () => [],
     promptArgv: (prompt) => ['--oneshot', prompt],
+    discoverModels: discoverHermesModels,
+    usesConfiguredModel: true,
     defaultModel: 'configured',
     availableModels: ['configured'],
   },
   ollama: {
     name: 'ollama',
     label: 'Ollama',
+    priority: 70,
     baseArgv: ['ollama', 'run'],
     modelArgv: (model) => (model ? [model] : []),
+    thinkingArgv: (level) => ['--think', level],
     promptArgv: (prompt) => [prompt],
+    discoverModels: discoverOllamaModels,
+    selectDefaultModel: (models) => models.find((model) => !/embed/i.test(model)) || models[0] || '',
     defaultModel: '',
     availableModels: [],
   },
 }
 
-function refreshHermesModels() {
-  const models = discoverHermesModels()
-  ADAPTERS.hermes.availableModels = ['configured', ...models]
-  ADAPTERS.hermes.defaultModel = 'configured'
-  return ADAPTERS.hermes
+async function refreshHermesModels() {
+  return refreshAdapterModels('hermes')
 }
 
-function refreshLocalModels() {
-  const codexModels = discoverCodexModels()
-  if (codexModels.length > 0) {
-    ADAPTERS.codex.availableModels = codexModels
-  }
-  const agyModels = discoverAgyModels()
-  if (agyModels.length > 0) {
-    ADAPTERS.agy.availableModels = agyModels
-  }
-  const ollamaModels = discoverOllamaModels()
-  ADAPTERS.ollama.availableModels = ollamaModels
-  if (!ADAPTERS.ollama.availableModels.includes(ADAPTERS.ollama.defaultModel)) {
-    ADAPTERS.ollama.defaultModel = ollamaModels[0] || ''
-  }
-  return { codex: ADAPTERS.codex, agy: ADAPTERS.agy, ollama: ADAPTERS.ollama }
+async function refreshLocalModels() {
+  const names = Object.keys(ADAPTERS).filter((name) => name !== 'hermes')
+  const refreshed = await Promise.all(names.map(refreshAdapterModels))
+  return Object.fromEntries(names.map((name, index) => [name, refreshed[index]]))
 }
 
-const ALL_PROVIDER_NAMES = ['claude', 'copilot', 'codex', 'gemini', 'agy', 'hermes', 'ollama']
+async function refreshAdapterModels(providerName) {
+  const adapter = ADAPTERS[providerName]
+  if (!adapter) return null
+  const discovered = adapter.discoverModels ? await adapter.discoverModels() : []
+  const models = [...new Set(discovered.filter((model) => typeof model === 'string' && model.trim()))]
+  const configuredOnly = adapter.usesConfiguredModel && adapter.availableModels.length === 1
+  if (models.length === 0 && adapter.availableModels.length > 0 && !configuredOnly) return adapter
+  adapter.availableModels = adapter.usesConfiguredModel ? ['configured', ...models] : models
+  if (!adapter.usesConfiguredModel) {
+    const selectedDefault = adapter.selectDefaultModel?.(adapter.availableModels)
+    if (selectedDefault || !adapter.availableModels.includes(adapter.defaultModel)) {
+      adapter.defaultModel = selectedDefault || adapter.availableModels[0] || ''
+    }
+  }
+  return adapter
+}
+
+const ALL_PROVIDER_NAMES = Object.keys(ADAPTERS)
 
 function isCommandAvailable(command) {
   const probe = spawnSync('which', [command], {
@@ -321,15 +359,11 @@ const DISABLED_PROVIDERS = ALL_PROVIDER_NAMES.filter(
   (providerName) => !PROVIDER_NAMES.includes(providerName),
 )
 
-const DEFAULT_CHAIN = [
-  { provider: 'codex', model: 'fast' },
-  { provider: 'hermes', model: ADAPTERS.hermes.defaultModel },
-  { provider: 'claude', model: 'haiku' },
-  { provider: 'copilot', model: 'claude-haiku-4.5' },
-  { provider: 'gemini', model: 'gemini-2.5-flash' },
-  { provider: 'agy', model: 'fast' },
-  { provider: 'ollama', model: ADAPTERS.ollama.defaultModel },
-].filter((step) => PROVIDER_NAMES.includes(step.provider) && step.model)
+const DEFAULT_PROVIDER_ORDER = [...ALL_PROVIDER_NAMES]
+  .sort((left, right) => ADAPTERS[left].priority - ADAPTERS[right].priority)
+const DEFAULT_CHAIN = DEFAULT_PROVIDER_ORDER
+  .filter((provider) => PROVIDER_NAMES.includes(provider) && ADAPTERS[provider].defaultModel)
+  .map((provider) => ({ provider, model: ADAPTERS[provider].defaultModel }))
 
 function refreshActiveProviders() {
   const active = ALL_PROVIDER_NAMES.filter((providerName) => {
@@ -345,15 +379,9 @@ function refreshActiveProviders() {
   DISABLED_PROVIDERS.length = 0
   DISABLED_PROVIDERS.push(...disabled)
 
-  const newDefaultChain = [
-    { provider: 'codex', model: 'fast' },
-    { provider: 'hermes', model: ADAPTERS.hermes.defaultModel },
-    { provider: 'claude', model: 'haiku' },
-    { provider: 'copilot', model: 'claude-haiku-4.5' },
-    { provider: 'gemini', model: 'gemini-2.5-flash' },
-    { provider: 'agy', model: 'fast' },
-    { provider: 'ollama', model: ADAPTERS.ollama.defaultModel },
-  ].filter((step) => PROVIDER_NAMES.includes(step.provider) && step.model)
+  const newDefaultChain = DEFAULT_PROVIDER_ORDER
+    .filter((provider) => PROVIDER_NAMES.includes(provider) && ADAPTERS[provider].defaultModel)
+    .map((provider) => ({ provider, model: ADAPTERS[provider].defaultModel }))
 
   DEFAULT_CHAIN.length = 0
   DEFAULT_CHAIN.push(...newDefaultChain)
@@ -361,10 +389,9 @@ function refreshActiveProviders() {
   return { PROVIDER_NAMES, DISABLED_PROVIDERS, DEFAULT_CHAIN }
 }
 
-function refreshAllModels() {
+async function refreshAllModels() {
+  await Promise.all(ALL_PROVIDER_NAMES.map(refreshAdapterModels))
   refreshActiveProviders()
-  refreshHermesModels()
-  refreshLocalModels()
   lastModelRefresh = Date.now()
   return {
     adapters: ADAPTERS,
@@ -374,21 +401,27 @@ function refreshAllModels() {
   }
 }
 
-refreshHermesModels()
-refreshLocalModels()
-
-const MODEL_REFRESH_TTL_MS = Number(process.env.GATEWAY_MODEL_REFRESH_TTL_MS) || 5_000
-let lastModelRefresh = Date.now()
-let modelRefreshPending = false
+const MODEL_REFRESH_TTL_MS = Number(process.env.GATEWAY_MODEL_REFRESH_TTL_MS) || 60_000
+let lastModelRefresh = 0
+let modelRefreshPromise = null
+let queuedFreshRefreshPromise = null
 
 function scheduleModelRefresh(force = false) {
-  if (modelRefreshPending || (!force && Date.now() - lastModelRefresh < MODEL_REFRESH_TTL_MS)) return
-  modelRefreshPending = true
-  try {
-    refreshAllModels()
-  } finally {
-    modelRefreshPending = false
+  if (modelRefreshPromise) return modelRefreshPromise
+  if (!force && Date.now() - lastModelRefresh < MODEL_REFRESH_TTL_MS) return null
+  modelRefreshPromise = refreshAllModels().finally(() => { modelRefreshPromise = null })
+  return modelRefreshPromise
+}
+
+function refreshModelsFresh() {
+  if (!modelRefreshPromise) return scheduleModelRefresh(true)
+  if (!queuedFreshRefreshPromise) {
+    queuedFreshRefreshPromise = modelRefreshPromise
+      .catch(() => undefined)
+      .then(() => scheduleModelRefresh(true))
+      .finally(() => { queuedFreshRefreshPromise = null })
   }
+  return queuedFreshRefreshPromise
 }
 
 /**
@@ -397,14 +430,16 @@ function scheduleModelRefresh(force = false) {
  * @param {string} prompt
  * @returns {Array<string>}
  */
-function buildArgv(step, prompt) {
+function buildArgv(step, prompt, defaultThinkingLevel = 'medium') {
   if (!step || !step.provider) throw new Error('Invalid chain step')
   const adapter = ADAPTERS[step.provider]
   if (!adapter) throw new Error(`Unknown provider: ${step.provider}`)
   const model = resolveModel(adapter, step.model)
+  const thinkingLevel = normalizeThinkingLevel(step.thinking_level ?? step.thinkingLevel ?? defaultThinkingLevel)
   return [
     ...adapter.baseArgv,
     ...adapter.modelArgv(model),
+    ...(adapter.thinkingArgv?.(thinkingLevel) || []),
     ...adapter.promptArgv(prompt),
   ]
 }
@@ -421,11 +456,16 @@ module.exports = {
   refreshHermesModels,
   discoverCodexModels,
   discoverAgyModels,
+  discoverGeminiModels,
   discoverOllamaModels,
+  parseDiscoveredModels,
   parseOllamaModels,
   refreshLocalModels,
+  refreshAdapterModels,
   refreshActiveProviders,
   refreshAllModels,
   scheduleModelRefresh,
+  refreshModelsFresh,
   resolveModel,
+  normalizeThinkingLevel,
 }

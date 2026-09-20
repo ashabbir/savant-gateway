@@ -233,7 +233,7 @@
   // ── Fetch Models & Providers ──
   async function loadModels(force = false) {
     try {
-      const url = force ? '/models?refresh=true' : '/models'
+      const url = '/models'
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to load models')
       const data = await res.json()

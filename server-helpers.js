@@ -1,4 +1,5 @@
 const chainLib = require('./chain')
+const { normalizeThinkingLevel } = require('./adapters')
 
 const EVICT_AFTER_MS = 10 * 60 * 1000
 const HTTP_NO_CONTENT = 204
@@ -17,6 +18,37 @@ function steeringPrompt(prompt, feedback = []) {
   if (!Array.isArray(feedback) || feedback.length === 0) return prompt
   const list = feedback.map((item) => `- ${item}`).join('\n')
   return `${prompt}\n\n## User feedback received while you were responding\n${list}\n\nRevise your approach and answer using this feedback.`
+}
+
+function continuationPrompt(prompt, response, message) {
+  return `${prompt}\n\nAssistant response:\n${response}\n\nUser follow-up:\n${message}`
+}
+
+function normalizeMessageMode(value) {
+  const mode = String(value || 'steer').toLowerCase()
+  if (mode !== 'steer' && mode !== 'queue') {
+    throw new Error('mode must be one of: steer, queue')
+  }
+  return mode
+}
+
+function submitRunMessage(run, message, requestedMode) {
+  const mode = normalizeMessageMode(requestedMode)
+  const content = typeof message === 'string' ? message.trim() : ''
+  if (!content) throw new Error('message must be a non-empty string')
+
+  if (mode === 'queue') {
+    run.messageQueue.push(content)
+    run.queuedUserFiles.push([])
+    run.queuedUserContents.push(content)
+    emit(run, { type: 'queued', message: content, position: run.messageQueue.length })
+    return { mode, position: run.messageQueue.length }
+  }
+
+  run.feedback.push(content)
+  emit(run, { type: 'steering', feedback: content, restart: true })
+  run.kill?.()
+  return { mode, feedbackCount: run.feedback.length }
 }
 
 /**
@@ -93,9 +125,13 @@ function createRun(params = {}) {
     subscribers: new Set(),
     kill: null,
     prompt: params.prompt,
+    currentPrompt: params.prompt,
     files: Array.isArray(params.files) ? params.files : [],
     chain: Array.isArray(params.chain) ? params.chain : [],
     feedback: [],
+    messageQueue: [],
+    queuedUserFiles: [],
+    queuedUserContents: [],
     cancelled: false,
     generation: 0,
     execution: params.execution === 'serial' ? 'serial' : 'race',
@@ -103,6 +139,7 @@ function createRun(params = {}) {
     staggerMs: Math.max(0, Number(params.staggerMs) || 0),
     startedAt: Date.now(),
     cwd: typeof params.cwd === 'string' && params.cwd ? params.cwd : undefined,
+    thinkingLevel: normalizeThinkingLevel(params.thinkingLevel ?? params.thinking_level),
   }
 }
 
@@ -164,7 +201,7 @@ function emit(run, event) {
  * @param {Function} [cleanupFiles]
  */
 async function executeRun(run, runsMap, cleanupFiles, sessionStore) {
-  const prompt = steeringPrompt(run.prompt, run.feedback)
+  const prompt = steeringPrompt(run.currentPrompt, run.feedback)
   run.kill = null
   const generation = ++run.generation
   const execute = run.execution === 'serial' ? chainLib.walkChain : chainLib.raceChain
@@ -173,8 +210,11 @@ async function executeRun(run, runsMap, cleanupFiles, sessionStore) {
 
   try {
     const { response, step } = await execute(prompt, run.chain, {
-      onThinking: (t) => emit(run, { type: 'thinking', ...t }),
+      onThinking: (t) => {
+        if (generation === run.generation) emit(run, { type: 'thinking', ...t })
+      },
       onChunk: (c) => {
+        if (generation !== run.generation) return
         if (!firstTokenTime) {
           firstTokenTime = Date.now()
         }
@@ -184,6 +224,7 @@ async function executeRun(run, runsMap, cleanupFiles, sessionStore) {
       cwd: run.cwd,
       concurrency: run.concurrency,
       staggerMs: run.staggerMs,
+      thinkingLevel: run.thinkingLevel,
     })
 
     if (run.cancelled || generation !== run.generation) return
@@ -206,16 +247,6 @@ async function executeRun(run, runsMap, cleanupFiles, sessionStore) {
       tokensPerSecond,
     }
 
-    run.status = 'complete'
-    run.result = { response, provider: step.provider, model: step.model, stats }
-    emit(run, {
-      type: 'complete',
-      content: response,
-      provider: step.provider,
-      model: step.model,
-      stats,
-    })
-
     if (run.session_id && sessionStore) {
       sessionStore.addMessage(run.session_id, {
         role: 'assistant',
@@ -225,6 +256,41 @@ async function executeRun(run, runsMap, cleanupFiles, sessionStore) {
         stats,
       })
     }
+
+    if (run.messageQueue.length > 0) {
+      const nextMessage = run.messageQueue.shift()
+      const queuedFiles = run.queuedUserFiles.shift() || []
+      const queuedUserContent = run.queuedUserContents.shift() || nextMessage
+      if (run.session_id && sessionStore) {
+        sessionStore.addMessage(run.session_id, {
+          role: 'user',
+          content: queuedUserContent,
+          files: queuedFiles,
+        })
+      }
+      run.currentPrompt = continuationPrompt(prompt, response, nextMessage)
+      run.feedback = []
+      run.result = { response, provider: step.provider, model: step.model, stats }
+      emit(run, {
+        type: 'turn_complete',
+        content: response,
+        provider: step.provider,
+        model: step.model,
+        stats,
+      })
+      emit(run, { type: 'dequeued', message: nextMessage, remaining: run.messageQueue.length })
+      return executeRun(run, runsMap, cleanupFiles, sessionStore)
+    }
+
+    run.status = 'complete'
+    run.result = { response, provider: step.provider, model: step.model, stats }
+    emit(run, {
+      type: 'complete',
+      content: response,
+      provider: step.provider,
+      model: step.model,
+      stats,
+    })
 
     finalizeRun(run, runsMap, cleanupFiles)
   } catch (err) {
@@ -244,6 +310,9 @@ async function executeRun(run, runsMap, cleanupFiles, sessionStore) {
 
 module.exports = {
   steeringPrompt,
+  continuationPrompt,
+  normalizeMessageMode,
+  submitRunMessage,
   isLocalOrigin,
   createRun,
   finalizeRun,
@@ -260,4 +329,3 @@ module.exports = {
   parseChain,
   filterActiveProviders,
 }
-

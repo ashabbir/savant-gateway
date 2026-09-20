@@ -15,7 +15,9 @@ const {
   corsMiddleware,
   executeRun,
   parseChain,
-  filterActiveProviders
+  filterActiveProviders,
+  normalizeMessageMode,
+  submitRunMessage,
 } = require('../server-helpers')
 const chainLib = require('../chain')
 
@@ -57,6 +59,34 @@ test('createRun', async (t) => {
     assert.equal(run.status, 'running')
     assert.equal(run.prompt, 'hello')
     assert.equal(run.concurrency, 2)
+    assert.equal(run.thinkingLevel, 'medium')
+    assert.deepEqual(run.messageQueue, [])
+  })
+})
+
+test('message delivery mode', async (t) => {
+  await t.test('defaults to steer and validates queue', () => {
+    assert.equal(normalizeMessageMode(), 'steer')
+    assert.equal(normalizeMessageMode('queue'), 'queue')
+    assert.throws(() => normalizeMessageMode('later'), /mode/)
+  })
+
+  await t.test('steer cancels the active generation and queue leaves it running', () => {
+    let killed = 0
+    const steered = createRun({ id: 'steer', prompt: 'start' })
+    steered.kill = () => { killed++ }
+    const steerResult = submitRunMessage(steered, 'change course')
+    assert.equal(steerResult.mode, 'steer')
+    assert.deepEqual(steered.feedback, ['change course'])
+    assert.equal(killed, 1)
+
+    const queued = createRun({ id: 'queue', prompt: 'start' })
+    queued.kill = () => { killed++ }
+    const queueResult = submitRunMessage(queued, 'do this next', 'queue')
+    assert.equal(queueResult.mode, 'queue')
+    assert.equal(queueResult.position, 1)
+    assert.deepEqual(queued.messageQueue, ['do this next'])
+    assert.equal(killed, 1)
   })
 })
 
@@ -166,6 +196,29 @@ test('executeRun', async (t) => {
     await executeRun(internalRun, runsMap, () => {})
     
     assert.equal(internalRun.status, 'running')
+  })
+
+  await t.test('runs queued messages only after the active response completes', async () => {
+    const prompts = []
+    test.mock.method(chainLib, 'raceChain', async (prompt) => {
+      prompts.push(prompt)
+      return {
+        response: prompts.length === 1 ? 'first answer' : 'second answer',
+        step: { provider: 'test', model: 'test' },
+      }
+    })
+    const run = createRun({ id: 'queued', prompt: 'first question' })
+    submitRunMessage(run, 'second question', 'queue')
+    const runsMap = new Map([['queued', run]])
+
+    await executeRun(run, runsMap, () => {})
+    await new Promise((resolve) => setImmediate(resolve))
+
+    assert.equal(prompts.length, 2)
+    assert.match(prompts[1], /first answer/)
+    assert.match(prompts[1], /second question/)
+    assert.equal(run.status, 'complete')
+    assert.equal(run.result.response, 'second answer')
   })
 })
 

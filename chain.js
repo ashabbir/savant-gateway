@@ -58,7 +58,7 @@ async function walkChain(prompt, chain = DEFAULT_CHAIN, callbacks = {}) {
 }
 
 async function executeWalkStep(step, prompt, callbacks) {
-  const { onThinking, onChunk, onKill, cwd, spawnAgent: spawn = spawnAgent } = callbacks
+  const { onThinking, onChunk, onKill, cwd, thinkingLevel, spawnAgent: spawn = spawnAgent } = callbacks
   const adapter = ADAPTERS[step.provider]
   if (!adapter) {
     onThinking?.({ provider: step.provider, model: step.model, tag: step.provider, status: 'skip', reason: 'unknown provider' })
@@ -70,7 +70,7 @@ async function executeWalkStep(step, prompt, callbacks) {
 
   let argv
   try {
-    argv = buildArgv(step, prompt)
+    argv = buildArgv(step, prompt, thinkingLevel)
   } catch (err) {
     onThinking?.({ provider: step.provider, model: step.model, tag, status: 'error', reason: err.message })
     return { type: 'error', error: err }
@@ -158,7 +158,12 @@ class RaceChainSession {
     }
 
     const outcome = await launchProvider(
-      step, this.prompt, this.spawn, this.callbacks.cwd, (kill) => this.activeKills.set(index, kill),
+      step,
+      this.prompt,
+      this.spawn,
+      this.callbacks.cwd,
+      (kill) => this.activeKills.set(index, kill),
+      this.callbacks.thinkingLevel,
     )
 
     this.active--
@@ -277,13 +282,13 @@ function resolveSteps(chain) {
  * @param {Function} onKill
  * @returns {Promise<Object>}
  */
-async function launchProvider(step, prompt, spawn, cwd, onKill) {
+async function launchProvider(step, prompt, spawn, cwd, onKill, thinkingLevel) {
   const adapter = ADAPTERS[step.provider]
   if (!adapter) return { status: 'skip' }
 
   let argv
   try {
-    argv = buildArgv(step, prompt)
+    argv = buildArgv(step, prompt, thinkingLevel)
   } catch (error) {
     return { status: 'argv_error', error }
   }
@@ -317,4 +322,3 @@ async function executeProviderSpawn(step, argv, spawn, cwd, onKill) {
 }
 
 module.exports = { walkChain, raceChain, resolveSteps, launchProvider }
-

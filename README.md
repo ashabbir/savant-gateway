@@ -108,7 +108,8 @@ Starts a new AI run directly. Accepts either `prompt` or a `messages` array:
   ],
   "cwd": "/path/to/workdir",
   "execution": "race",
-  "concurrency": 2
+  "concurrency": 2,
+  "thinking_level": "medium"
 }
 ```
 - `prompt` (required): The prompt string.
@@ -116,6 +117,7 @@ Starts a new AI run directly. Accepts either `prompt` or a `messages` array:
 - `cwd` (optional): The working directory for the spawned agent.
 - `execution` (optional): `race` (default) or `serial`.
 - `concurrency` (optional): Provider subprocess limit for race mode (1–6).
+- `thinking_level` (optional): `low`, `medium`, or `high`; defaults to `medium`.
 
 Files can be attached using multipart form data. `chain` must be JSON when
 sent as a form field:
@@ -150,19 +152,26 @@ Poll for the current status and result of a run.
 ### `DELETE /runs/:id`
 Kill an in-flight run.
 
-### `POST /runs/:id/feedback`
-Steer an in-flight run with a new user message.
+### `POST /runs/:id/messages` or `POST /runs/:id/feedback`
+Send a message to an in-flight run. Messages steer by default; set `mode` to
+`queue` to wait for the current answer and run the message next.
 
 ```json
-{ "feedback": "Use the existing auth flow instead." }
+{ "message": "Use the existing auth flow instead.", "mode": "steer" }
 ```
 
 The gateway emits a `steering` SSE event, stops the current one-shot CLI
 invocation, and restarts it with the original prompt plus all feedback received
-for the run. This avoids relying on incompatible interactive stdin protocols.
+for the run. Queue mode leaves the active invocation untouched, emits `queued`,
+then emits `turn_complete` and `dequeued` before starting the next turn.
 
 ### `GET /models`
-List all supported providers and their available models, including whether they are currently enabled on your system.
+List installed providers and models freshly discovered from their local CLI or cache.
+Providers whose CLI does not expose a model catalog return `configured`, which
+means the gateway lets that provider use its own current model setting. Every
+request waits for a fresh parallel discovery pass. If a provider probe fails or
+times out, the gateway preserves that provider's last successfully discovered
+catalog rather than replacing it with an empty list.
 
 ### `GET /health`
 Returns service status, uptime, and active providers.
