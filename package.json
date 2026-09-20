@@ -1,6 +1,6 @@
 {
   "name": "savant-arena",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Host-native AI provider arena and model benchmark tournament for the Savant ecosystem",
   "main": "server.js",
   "scripts": {
