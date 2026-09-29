@@ -31,11 +31,11 @@ test('Ollama runs with the selected model before the prompt', () => {
   )
 })
 
-test('thinking level defaults to medium and accepts only low, medium, or high', () => {
+test('thinking level defaults to medium and accepts any provider-supported level', () => {
   assert.equal(normalizeThinkingLevel(), 'medium')
   assert.equal(normalizeThinkingLevel('LOW'), 'low')
-  assert.equal(normalizeThinkingLevel('high'), 'high')
-  assert.throws(() => normalizeThinkingLevel('max'), /thinking_level/)
+  assert.equal(normalizeThinkingLevel('max'), 'max')
+  assert.throws(() => normalizeThinkingLevel('bogus'), /thinking_level/)
 })
 
 test('provider argv receives native thinking effort with per-step overrides', () => {
@@ -69,10 +69,68 @@ test('adapter-owned discovery populates the provider model catalog', async (t) =
 
 test('transient empty discovery preserves the last good model catalog', async (t) => {
   const { ADAPTERS, refreshAdapterModels } = require('../adapters')
-  ADAPTERS.hermes.availableModels = ['configured', 'openrouter/example/model']
-  t.mock.method(ADAPTERS.hermes, 'discoverModels', async () => [])
+  ADAPTERS.gemini.availableModels = ['configured', 'live-one']
+  t.mock.method(ADAPTERS.gemini, 'discoverModels', async () => [])
+  await refreshAdapterModels('gemini')
+  assert.deepEqual(ADAPTERS.gemini.availableModels, ['configured', 'live-one'])
+})
+
+test('Hermes exposes only its configured model', async () => {
+  const { ADAPTERS, refreshAdapterModels } = require('../adapters')
+  ADAPTERS.hermes.availableModels = ['configured']
   await refreshAdapterModels('hermes')
-  assert.deepEqual(ADAPTERS.hermes.availableModels, ['configured', 'openrouter/example/model'])
+  assert.deepEqual(ADAPTERS.hermes.availableModels, ['configured'])
+  assert.equal(ADAPTERS.hermes.discoverModels, undefined)
+})
+
+test('Copilot discovery keeps only entitled chat models with their effort support', () => {
+  const { parseCopilotEntitledModels } = require('../adapters')
+  const catalog = [
+    { id: 'claude-sonnet-5', model_picker_enabled: true, policy: { state: 'enabled' }, capabilities: { type: 'chat', supports: { reasoning_effort: ['low', 'high'] } } },
+    { id: 'claude-haiku-4.5', model_picker_enabled: true, policy: { state: 'enabled' }, capabilities: { type: 'chat', supports: {} } },
+    { id: 'gpt-5.6-luna-utility', model_picker_enabled: false, capabilities: { type: 'chat' } },
+    { id: 'blocked', model_picker_enabled: true, policy: { state: 'disabled' }, capabilities: { type: 'chat' } },
+    { id: 'text-embedding-3-small', model_picker_enabled: true, capabilities: { type: 'embeddings' } },
+  ]
+  const log = `2026-09-29T01:59:12Z [DEBUG] [rust:capi_models] fetched models from CAPI /models ${JSON.stringify({ count: 5, models: JSON.stringify(catalog) })}`
+  assert.deepEqual(parseCopilotEntitledModels(log), {
+    models: ['claude-sonnet-5', 'claude-haiku-4.5'],
+    thinkingLevels: { 'claude-sonnet-5': ['low', 'high'], 'claude-haiku-4.5': [] },
+  })
+})
+
+test('Copilot effort follows per-model support', () => {
+  const { ADAPTERS } = require('../adapters')
+  ADAPTERS.copilot.modelThinkingLevels = { 'claude-haiku-4.5': [], 'kimi-k3': ['low', 'high', 'max'] }
+  assert.deepEqual(buildArgv({ provider: 'copilot', model: 'claude-haiku-4.5', thinking_level: 'high' }, 'hi'),
+    ['copilot', '--allow-all', '--model', 'claude-haiku-4.5', '--prompt', 'hi'])
+  assert.deepEqual(buildArgv({ provider: 'copilot', model: 'kimi-k3', thinking_level: 'medium' }, 'hi'),
+    ['copilot', '--allow-all', '--model', 'kimi-k3', '--reasoning-effort', 'low', '--prompt', 'hi'])
+  delete ADAPTERS.copilot.modelThinkingLevels
+})
+
+test('effort is passed natively per provider and clamped to supported levels', () => {
+  assert.deepEqual(
+    buildArgv({ provider: 'copilot', model: 'gpt-5.6-luna', thinking_level: 'xhigh' }, 'hi'),
+    ['copilot', '--allow-all', '--model', 'gpt-5.6-luna', '--reasoning-effort', 'xhigh', '--prompt', 'hi'],
+  )
+  assert.deepEqual(
+    buildArgv({ provider: 'copilot', model: 'auto', thinking_level: 'high' }, 'hi'),
+    ['copilot', '--allow-all', '--model', 'auto', '--prompt', 'hi'],
+  )
+  assert.deepEqual(
+    buildArgv({ provider: 'hermes', model: 'configured', thinking_level: 'ultra' }, 'hi'),
+    ['hermes', '--yolo', '--reasoning', 'ultra', '--oneshot', 'hi'],
+  )
+  assert.deepEqual(
+    buildArgv({ provider: 'claude', model: 'opus', thinking_level: 'max' }, 'hi'),
+    ['claude', '-p', '--dangerously-skip-permissions', '--model', 'opus', '--effort', 'max', 'hi'],
+  )
+  // Gemini only supports low/medium/high, so an unsupported level falls back to its default
+  assert.deepEqual(
+    buildArgv({ provider: 'gemini', model: 'configured', thinking_level: 'max' }, 'hi'),
+    ['gemini', '--dangerously-skip-permissions', '--effort', 'medium', '--print', 'hi'],
+  )
 })
 
 test('Ollama avoids choosing an embedding model as its chat default', async (t) => {

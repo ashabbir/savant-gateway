@@ -3,14 +3,36 @@ const path = require('path')
 const fs = require('fs')
 const { spawn, spawnSync } = require('child_process')
 
-const THINKING_LEVELS = new Set(['low', 'medium', 'high'])
+const BASE_THINKING_LEVELS = ['low', 'medium', 'high']
+const CLAUDE_THINKING_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max']
+const COPILOT_THINKING_LEVELS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
+const HERMES_THINKING_LEVELS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+const ALL_THINKING_LEVELS = new Set([...BASE_THINKING_LEVELS, ...CLAUDE_THINKING_LEVELS, ...COPILOT_THINKING_LEVELS, ...HERMES_THINKING_LEVELS])
 
+/**
+ * Validates a requested effort against the union of every provider's levels.
+ * Per-provider clamping happens in {@link thinkingLevelFor}.
+ * @param {string} [value]
+ * @returns {string}
+ */
 function normalizeThinkingLevel(value) {
   const level = String(value || 'medium').toLowerCase()
-  if (!THINKING_LEVELS.has(level)) {
-    throw new Error('thinking_level must be one of: low, medium, high')
+  if (!ALL_THINKING_LEVELS.has(level)) {
+    throw new Error(`thinking_level must be one of: ${[...ALL_THINKING_LEVELS].join(', ')}`)
   }
   return level
+}
+
+/**
+ * Returns the effort the adapter supports, falling back to its default so
+ * mixed-provider chains never fail on a level only some CLIs accept.
+ * @param {Object} adapter
+ * @param {string} level
+ * @returns {string}
+ */
+function thinkingLevelFor(adapter, level) {
+  const levels = adapter?.thinkingLevels || BASE_THINKING_LEVELS
+  return levels.includes(level) ? level : (adapter?.defaultThinkingLevel || 'medium')
 }
 
 // Same PATH augmentation as Quorum's main.ts — GUI-launched processes don't
@@ -83,7 +105,7 @@ function resolveModel(adapter, model) {
   return requested
 }
 
-function runDiscovery(command, args, { timeout = 5_000, env = buildChildEnv() } = {}) {
+function runDiscovery(command, args, { timeout = 5_000, env = buildChildEnv(), allowFailure = false } = {}) {
   return new Promise((resolve) => {
     let settled = false
     let stdout = ''
@@ -101,7 +123,7 @@ function runDiscovery(command, args, { timeout = 5_000, env = buildChildEnv() } 
     timer.unref?.()
     child.stdout.on('data', (chunk) => { stdout += chunk.toString() })
     child.on('error', () => finish(''))
-    child.on('close', (code) => finish(code === 0 ? stdout : ''))
+    child.on('close', (code) => finish(code === 0 || allowFailure ? stdout : ''))
   })
 }
 
@@ -114,6 +136,7 @@ const HERMES_PYTHON = process.env.HERMES_PYTHON || path.join(
  * @returns {Array<string>}
  */
 async function discoverHermesModels() {
+  // Retained for diagnostics; the Hermes adapter only exposes its configured model.
   if (!fs.existsSync(HERMES_PYTHON)) return []
 
   const output = await runDiscovery(HERMES_PYTHON, ['-c', [
@@ -135,6 +158,96 @@ async function discoverHermesModels() {
 }
 
 /**
+ * Reads the model Hermes is configured to use (display only).
+ * @returns {string}
+ */
+function readHermesConfiguredModel() {
+  try {
+    const yaml = fs.readFileSync(path.join(os.homedir(), '.hermes', 'config.yaml'), 'utf8')
+    const block = yaml.match(/^model:\s*\n((?:[ \t]+.*\n?)*)/m)?.[1] || ''
+    const model = block.match(/^\s+default:\s*(\S+)/m)?.[1]
+    const provider = block.match(/^\s+provider:\s*(\S+)/m)?.[1]
+    if (!model) return ''
+    return provider ? `${provider}/${model}` : model
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Parses the entitled model catalog Copilot logs at debug level
+ * (`[rust:capi_models] fetched models from CAPI /models {...}`).
+ * Keeps chat models the account can pick; returns per-model effort support.
+ * @param {string} logText
+ * @returns {{ models: Array<string>, thinkingLevels: Object<string, Array<string>> }}
+ */
+function parseCopilotEntitledModels(logText) {
+  const empty = { models: [], thinkingLevels: {} }
+  if (typeof logText !== 'string') return empty
+  const line = logText.split(/\r?\n/).reverse().find((entry) => entry.includes('fetched models from CAPI /models'))
+  if (!line) return empty
+  try {
+    const payload = JSON.parse(line.slice(line.indexOf('{"count"')))
+    const catalog = typeof payload.models === 'string' ? JSON.parse(payload.models) : payload.models
+    const result = { models: [], thinkingLevels: {} }
+    for (const model of Array.isArray(catalog) ? catalog : []) {
+      if (!model?.id || !model.model_picker_enabled) continue
+      if (model.capabilities?.type !== 'chat') continue
+      if (model.policy?.state && model.policy.state !== 'enabled') continue
+      result.models.push(model.id)
+      const efforts = model.capabilities?.supports?.reasoning_effort
+      result.thinkingLevels[model.id] = Array.isArray(efforts) ? efforts : []
+    }
+    return result
+  } catch {
+    return empty
+  }
+}
+
+const COPILOT_MODELS_TTL_MS = 30 * 60 * 1000
+let copilotModelsCache = null
+
+/**
+ * Discovers the Copilot models this account is entitled to. Requesting an
+ * unknown model makes the CLI fetch the catalog and exit before any LLM call.
+ * @returns {Promise<Array<string>>}
+ */
+async function discoverCopilotModels() {
+  if (copilotModelsCache) {
+    // Stale-while-revalidate: the probe takes seconds and /models must stay fast
+    if (Date.now() - copilotModelsCache.at >= COPILOT_MODELS_TTL_MS && !copilotModelsCache.refreshing) {
+      copilotModelsCache.refreshing = probeCopilotModels().finally(() => { if (copilotModelsCache) copilotModelsCache.refreshing = null })
+    }
+    return copilotModelsCache.models
+  }
+  return probeCopilotModels()
+}
+
+async function probeCopilotModels() {
+  const logDir = fs.mkdtempSync(path.join(os.tmpdir(), 'savant-copilot-models-'))
+  try {
+    await runDiscovery('copilot', [
+      '--log-level', 'all', '--log-dir', logDir,
+      '--model', '__savant_model_probe__', '--prompt', 'probe',
+    ], { timeout: 30_000, allowFailure: true })
+    const logText = fs.readdirSync(logDir).map((name) => fs.readFileSync(path.join(logDir, name), 'utf8')).join('\n')
+    const { models, thinkingLevels } = parseCopilotEntitledModels(logText)
+    if (!models.length) return copilotModelsCache?.models || []
+    ADAPTERS.copilot.modelThinkingLevels = thinkingLevels
+    copilotModelsCache = { at: Date.now(), models: ['auto', ...models] }
+    return copilotModelsCache.models
+  } finally {
+    fs.rmSync(logDir, { recursive: true, force: true })
+  }
+}
+
+// Claude Code has no model-list command: aliases from `claude --help` plus current full IDs.
+const CLAUDE_MODELS = [
+  'fable', 'opus', 'sonnet', 'haiku',
+  'claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-haiku-4-5-20251001',
+]
+
+/**
  * Discovers models from local Codex config directory.
  * @returns {Array<string>}
  */
@@ -149,6 +262,11 @@ function discoverCodexModels() {
       .filter((model) => !['hide', 'hidden'].includes(String(model.visibility || '').toLowerCase()))
       .map((model) => model.slug.trim())
       .filter(Boolean)
+    const levels = models
+      .flatMap((model) => (Array.isArray(model?.supported_reasoning_levels) ? model.supported_reasoning_levels : []))
+      .map((level) => String(level?.effort || level || '').toLowerCase())
+      .filter(Boolean)
+    if (levels.length) ADAPTERS.codex.thinkingLevels = [...new Set(levels)]
     return [...new Set(ids)]
   } catch {
     return []
@@ -212,6 +330,9 @@ const ADAPTERS = {
     modelArgv: (model) => (model ? ['--model', model] : []),
     thinkingArgv: (level) => ['--effort', level],
     promptArgv: (prompt) => [prompt],
+    discoverModels: async () => CLAUDE_MODELS,
+    thinkingLevels: CLAUDE_THINKING_LEVELS,
+    defaultThinkingLevel: 'medium',
     usesConfiguredModel: true,
     defaultModel: 'configured',
     availableModels: ['configured'],
@@ -222,8 +343,18 @@ const ADAPTERS = {
     priority: 40,
     baseArgv: ['copilot', '--allow-all'],
     modelArgv: (model) => (model ? ['--model', model] : []),
-    thinkingArgv: (level) => ['--effort', level],
+    // `auto` and models without reasoning support reject an explicit effort
+    thinkingArgv(level, model) {
+      if (!model || model === 'auto') return model === 'auto' ? [] : ['--reasoning-effort', level]
+      const supported = this.modelThinkingLevels?.[model]
+      if (!supported) return ['--reasoning-effort', level]
+      if (!supported.length) return []
+      return ['--reasoning-effort', supported.includes(level) ? level : (supported.includes('medium') ? 'medium' : supported[0])]
+    },
     promptArgv: (prompt) => ['--prompt', prompt],
+    discoverModels: discoverCopilotModels,
+    thinkingLevels: COPILOT_THINKING_LEVELS,
+    defaultThinkingLevel: 'medium',
     usesConfiguredModel: true,
     defaultModel: 'configured',
     availableModels: ['configured'],
@@ -290,9 +421,12 @@ const ADAPTERS = {
         '--model', model.slice(separator + 1),
       ]
     },
-    thinkingArgv: () => [],
+    thinkingArgv: (level) => ['--reasoning', level],
     promptArgv: (prompt) => ['--oneshot', prompt],
-    discoverModels: discoverHermesModels,
+    // Only the configured model: full catalog discovery returns thousands of options.
+    thinkingLevels: HERMES_THINKING_LEVELS,
+    defaultThinkingLevel: 'medium',
+    configuredModel: readHermesConfiguredModel,
     usesConfiguredModel: true,
     defaultModel: 'configured',
     availableModels: ['configured'],
@@ -342,6 +476,8 @@ async function refreshAdapterModels(providerName) {
 const ALL_PROVIDER_NAMES = Object.keys(ADAPTERS)
 
 function isCommandAvailable(command) {
+  // Explicit opt-in so tests (and CI without every CLI) see the full provider set
+  if (process.env.GATEWAY_ASSUME_ALL_PROVIDERS === '1') return true
   const probe = spawnSync('which', [command], {
     env: buildChildEnv(),
     stdio: 'ignore',
@@ -435,11 +571,11 @@ function buildArgv(step, prompt, defaultThinkingLevel = 'medium') {
   const adapter = ADAPTERS[step.provider]
   if (!adapter) throw new Error(`Unknown provider: ${step.provider}`)
   const model = resolveModel(adapter, step.model)
-  const thinkingLevel = normalizeThinkingLevel(step.thinking_level ?? step.thinkingLevel ?? defaultThinkingLevel)
+  const thinkingLevel = thinkingLevelFor(adapter, normalizeThinkingLevel(step.thinking_level ?? step.thinkingLevel ?? defaultThinkingLevel))
   return [
     ...adapter.baseArgv,
     ...adapter.modelArgv(model),
-    ...(adapter.thinkingArgv?.(thinkingLevel) || []),
+    ...(adapter.thinkingArgv?.(thinkingLevel, model) || []),
     ...adapter.promptArgv(prompt),
   ]
 }
@@ -468,4 +604,9 @@ module.exports = {
   refreshModelsFresh,
   resolveModel,
   normalizeThinkingLevel,
+  thinkingLevelFor,
+  parseCopilotEntitledModels,
+  discoverCopilotModels,
+  readHermesConfiguredModel,
+  BASE_THINKING_LEVELS,
 }

@@ -8,6 +8,7 @@ const {
   PROVIDER_NAMES,
   DISABLED_PROVIDERS,
   normalizeThinkingLevel,
+  BASE_THINKING_LEVELS,
   scheduleModelRefresh,
   refreshModelsFresh,
 } = require('./adapters')
@@ -458,8 +459,10 @@ app.get(['/models', '/api/models', '/providers', '/api/providers'], async (req, 
       enabled: PROVIDER_NAMES.includes(id),
       defaultModel: adapter.defaultModel,
       models: adapter.availableModels,
-      thinkingLevels: ['low', 'medium', 'high'],
-      defaultThinkingLevel: 'medium',
+      configuredModel: adapter.configuredModel?.() || undefined,
+      modelThinkingLevels: adapter.modelThinkingLevels || undefined,
+      thinkingLevels: adapter.thinkingLevels || BASE_THINKING_LEVELS,
+      defaultThinkingLevel: adapter.defaultThinkingLevel || 'medium',
     }
   })
   res.json({ providers, refreshing: false })

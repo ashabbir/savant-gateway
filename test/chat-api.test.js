@@ -190,7 +190,7 @@ test('Chat and Session API Endpoints', async (t) => {
       body: JSON.stringify({
         prompt: 'Invalid effort',
         chain: [{ provider: provider.id, model: provider.defaultModel }],
-        thinking_level: 'max',
+        thinking_level: 'bogus',
       }),
     })
     assert.equal(invalidRes.status, 400)

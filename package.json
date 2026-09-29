@@ -1,12 +1,12 @@
 {
   "name": "savant-arena",
-  "version": "3.0.0",
+  "version": "3.2.0",
   "description": "Host-native AI provider arena and model benchmark tournament for the Savant ecosystem",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "GATEWAY_ASSUME_ALL_PROVIDERS=1 node --test"
   },
   "dependencies": {
     "express": "^4.19.2",
